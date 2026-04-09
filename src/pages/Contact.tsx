@@ -29,7 +29,7 @@ export default function Contact() {
               </div>
               <div>
                 <h3 className="font-semibold text-lg text-slate-900 dark:text-white">Email</h3>
-                <p className="text-slate-600 dark:text-slate-400 mt-1">support@pdfmaster.com</p>
+                <p className="text-slate-600 dark:text-slate-400 mt-1">support@ieltsaid.net</p>
               </div>
             </CardContent>
           </Card>
@@ -53,7 +53,7 @@ export default function Contact() {
               </div>
               <div>
                 <h3 className="font-semibold text-lg text-slate-900 dark:text-white">Office</h3>
-                <p className="text-slate-600 dark:text-slate-400 mt-1">123 PDF Street, Suite 100<br/>San Francisco, CA 94103</p>
+                <p className="text-slate-600 dark:text-slate-400 mt-1">123 IELTS Street, Suite 100<br/>San Francisco, CA 94103</p>
               </div>
             </CardContent>
           </Card>

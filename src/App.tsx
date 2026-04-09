@@ -1,43 +1,54 @@
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { BrowserRouter, Routes, Route, useLocation, Navigate } from "react-router-dom";
 import Layout from "./components/Layout";
 import Home from "./pages/Home";
-import Tools from "./pages/Tools";
-import Pricing from "./pages/Pricing";
-import Contact from "./pages/Contact";
+import AdminPanel from "./pages/AdminPanel";
+import IELTSSection from "./pages/IELTSSection";
+import Auth from "./pages/Auth";
+import { GeminiProvider, useGemini } from "./components/GeminiContext";
 import { ThemeProvider } from "./components/ThemeProvider";
+import { useEffect } from "react";
 
-// Tools
-import MergePDF from "./pages/tools/MergePDF";
-import SplitPDF from "./pages/tools/SplitPDF";
-import CompressPDF from "./pages/tools/CompressPDF";
-import ImageToPDF from "./pages/tools/ImageToPDF";
-import PDFToWord from "./pages/tools/PDFToWord";
-import TextToPDF from "./pages/tools/TextToPDF";
-import WordToPDF from "./pages/tools/WordToPDF";
+function ScrollToTop() {
+  const { pathname } = useLocation();
+  useEffect(() => {
+    window.scrollTo(0, 0);
+  }, [pathname]);
+  return null;
+}
+
+function ProtectedRoute({ children }: { children: React.ReactNode }) {
+  const { user, loading } = useGemini();
+  
+  if (loading) return null;
+  if (!user) return <Navigate to="/auth" />;
+  
+  return <>{children}</>;
+}
+
+function AppRoutes() {
+  return (
+    <Routes>
+      <Route path="/auth" element={<Auth />} />
+      <Route path="/" element={<Layout />}>
+        <Route index element={<Home />} />
+        <Route path="admin" element={<ProtectedRoute><AdminPanel /></ProtectedRoute>} />
+        <Route path=":category" element={<ProtectedRoute><IELTSSection /></ProtectedRoute>} />
+      </Route>
+    </Routes>
+  );
+}
 
 export default function App() {
   return (
-    <ThemeProvider defaultTheme="system" storageKey="pdf-tools-theme">
-      <BrowserRouter>
-        <Routes>
-          <Route path="/" element={<Layout />}>
-            <Route index element={<Home />} />
-            <Route path="tools" element={<Tools />} />
-            <Route path="pricing" element={<Pricing />} />
-            <Route path="contact" element={<Contact />} />
-            
-            {/* Tool Routes */}
-            <Route path="tools/merge" element={<MergePDF />} />
-            <Route path="tools/split" element={<SplitPDF />} />
-            <Route path="tools/compress" element={<CompressPDF />} />
-            <Route path="tools/image-to-pdf" element={<ImageToPDF />} />
-            <Route path="tools/pdf-to-word" element={<PDFToWord />} />
-            <Route path="tools/text-to-pdf" element={<TextToPDF />} />
-            <Route path="tools/word-to-pdf" element={<WordToPDF />} />
-          </Route>
-        </Routes>
-      </BrowserRouter>
+    <ThemeProvider defaultTheme="system" storageKey="ielts-theme">
+      <GeminiProvider>
+        <BrowserRouter>
+          <ScrollToTop />
+          <AppRoutes />
+        </BrowserRouter>
+      </GeminiProvider>
     </ThemeProvider>
   );
 }
+
 

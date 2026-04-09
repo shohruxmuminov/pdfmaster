@@ -1,0 +1,737 @@
+import React, { useState, useRef, useMemo } from "react";
+import { useParams, Navigate, Link } from "react-router-dom";
+import { useGemini } from "@/src/components/GeminiContext";
+import { Button } from "@/src/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/src/components/ui/card";
+import { motion, AnimatePresence } from "framer-motion";
+import { AITutorModal } from "@/src/components/AITutorModal";
+import { SpeakingControls } from "@/src/components/SpeakingControls";
+import { 
+  FileText, 
+  Play, 
+  CheckCircle2, 
+  ArrowLeft, 
+  Send, 
+  Maximize2, 
+  Minimize2, 
+  Headphones, 
+  BookOpen, 
+  PenTool, 
+  Mic2, 
+  Search, 
+  LayoutGrid,
+  Clock,
+  TrendingUp,
+  Sparkles,
+  Home as HomeIcon,
+  Bot,
+  Calendar,
+  Download
+} from "lucide-react";
+
+export default function IELTSSection() {
+  const { category } = useParams<{ category: string }>();
+  const { isPremiumPlus, materials, submitResult } = useGemini();
+  const [selectedMaterial, setSelectedMaterial] = useState<any>(null);
+  const [resultForm, setResultForm] = useState({ firstName: "", lastName: "", telegramUsername: "", score: "" });
+  const [isSubmitted, setIsSubmitted] = useState(false);
+  const [isFullscreen, setIsFullscreen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [activeFilter, setActiveFilter] = useState("All Tests");
+  const [isAITutorOpen, setIsAITutorOpen] = useState(false);
+  const [timeLeft, setTimeLeft] = useState(3600);
+  const [isTimerActive, setIsTimerActive] = useState(false);
+  const viewerRef = useRef<HTMLDivElement>(null);
+
+  React.useEffect(() => {
+    let interval: any = null;
+    if (isTimerActive && timeLeft > 0) {
+      interval = setInterval(() => {
+        setTimeLeft((prev) => prev - 1);
+      }, 1000);
+    } else if (timeLeft === 0) {
+      setIsTimerActive(false);
+    }
+    return () => clearInterval(interval);
+  }, [isTimerActive, timeLeft]);
+
+  const formatTime = (seconds: number) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+  };
+
+  const progress = useMemo(() => {
+    return ((3600 - timeLeft) / 3600) * 100;
+  }, [timeLeft]);
+
+  React.useEffect(() => {
+    const handleFullscreenChange = () => {
+      setIsFullscreen(!!document.fullscreenElement);
+    };
+
+    document.addEventListener("fullscreenchange", handleFullscreenChange);
+    return () => document.removeEventListener("fullscreenchange", handleFullscreenChange);
+  }, []);
+
+  React.useEffect(() => {
+    window.scrollTo(0, 0);
+  }, [category, selectedMaterial]);
+
+  if (!isPremiumPlus) {
+    return <Navigate to="/" />;
+  }
+
+  const sectionConfig = useMemo(() => {
+    const cat = category?.toLowerCase();
+    switch (cat) {
+      case "listening":
+        return {
+          title: "IELTS Listening Tests",
+          subtitle: "Authentic audio materials with native speakers to improve your listening comprehension",
+          icon: <Headphones className="h-8 w-8" />,
+          color: "bg-[#107c54]",
+          textColor: "text-[#107c54]",
+          borderColor: "border-[#107c54]",
+          buttonColor: "bg-[#107c54] hover:bg-[#0d6343]",
+          accentColor: "bg-[#107c54]/10",
+          sidebarIcon: Headphones,
+          type: "standard"
+        };
+      case "reading":
+        return {
+          title: "IELTS Reading Tests",
+          subtitle: "Comprehensive reading practice with authentic IELTS materials and detailed feedback",
+          icon: <BookOpen className="h-8 w-8" />,
+          color: "bg-[#2563eb]",
+          textColor: "text-[#2563eb]",
+          borderColor: "border-[#2563eb]",
+          buttonColor: "bg-[#2563eb] hover:bg-[#1d4ed8]",
+          accentColor: "bg-[#2563eb]/10",
+          sidebarIcon: BookOpen,
+          type: "standard"
+        };
+      case "writing":
+        return {
+          title: "IELTS Writing Practice",
+          subtitle: "Choose a question set to practice your academic or general writing tasks",
+          icon: <PenTool className="h-8 w-8" />,
+          color: "bg-[#ef4444]",
+          textColor: "text-[#ef4444]",
+          borderColor: "border-[#ef4444]",
+          buttonColor: "bg-[#ef4444] hover:bg-[#dc2626]",
+          accentColor: "bg-[#ef4444]/10",
+          sidebarIcon: PenTool,
+          type: "writing"
+        };
+      case "speaking":
+        return {
+          title: "IELTS Speaking Practice",
+          subtitle: "Practice real speaking topics with AI feedback and native-like prompts",
+          icon: <Mic2 className="h-8 w-8" />,
+          color: "bg-[#8b5cf6]",
+          textColor: "text-[#8b5cf6]",
+          borderColor: "border-[#8b5cf6]",
+          buttonColor: "bg-[#8b5cf6] hover:bg-[#7c3aed]",
+          accentColor: "bg-[#8b5cf6]/10",
+          sidebarIcon: Mic2,
+          type: "standard"
+        };
+      case "books":
+        return {
+          title: "Premium IELTS Books",
+          subtitle: "Exclusive collection of the best IELTS preparation books and study guides",
+          icon: <BookOpen className="h-8 w-8" />,
+          color: "bg-[#f59e0b]",
+          textColor: "text-[#f59e0b]",
+          borderColor: "border-[#f59e0b]",
+          buttonColor: "bg-[#f59e0b] hover:bg-[#d97706]",
+          accentColor: "bg-[#f59e0b]/10",
+          sidebarIcon: BookOpen,
+          type: "standard"
+        };
+      case "vocabulary":
+        return {
+          title: "Premium Vocabulary",
+          subtitle: "Aid high-level vocabulary with our curated lists and practice materials",
+          icon: <Sparkles className="h-8 w-8" />,
+          color: "bg-[#ec4899]",
+          textColor: "text-[#ec4899]",
+          borderColor: "border-[#ec4899]",
+          buttonColor: "bg-[#ec4899] hover:bg-[#db2777]",
+          accentColor: "bg-[#ec4899]/10",
+          sidebarIcon: Sparkles,
+          type: "standard"
+        };
+      default:
+        return {
+          title: "IELTS Practice",
+          subtitle: "Aid your IELTS skills with our premium materials",
+          icon: <Sparkles className="h-8 w-8" />,
+          color: "bg-slate-900",
+          textColor: "text-slate-900",
+          borderColor: "border-slate-900",
+          buttonColor: "bg-slate-900 hover:bg-slate-800",
+          accentColor: "bg-slate-900/10",
+          sidebarIcon: FileText,
+          type: "standard"
+        };
+    }
+  }, [category]);
+
+  const sectionMaterials = materials.filter(m => m.category.toLowerCase() === category?.toLowerCase());
+  
+  const filteredMaterials = useMemo(() => {
+    return sectionMaterials
+      .filter(m => m.name.toLowerCase().includes(searchQuery.toLowerCase()))
+      .filter(m => {
+        if (activeFilter === "All Tests") return true;
+        if (category?.toLowerCase() === "books" && m.subCategory) {
+          return m.subCategory === activeFilter;
+        }
+        return m.name.includes(activeFilter);
+      });
+  }, [sectionMaterials, searchQuery, activeFilter, category]);
+
+  const sidebarFilters = useMemo(() => {
+    const counts: Record<string, number> = { "All Tests": sectionMaterials.length };
+    
+    if (category?.toLowerCase() === "books") {
+      sectionMaterials.forEach(m => {
+        if (m.subCategory) {
+          counts[m.subCategory] = (counts[m.subCategory] || 0) + 1;
+        }
+      });
+    } else {
+      sectionMaterials.forEach(m => {
+        const parts = m.name.split(",");
+        if (parts.length > 0) {
+          const prefix = parts[0].trim();
+          counts[prefix] = (counts[prefix] || 0) + 1;
+        }
+      });
+    }
+
+    return Object.entries(counts).map(([name, count]) => ({ name, count }));
+  }, [sectionMaterials, category]);
+
+  const toggleFullscreen = () => {
+    if (!viewerRef.current) return;
+
+    if (!document.fullscreenElement) {
+      viewerRef.current.requestFullscreen().catch(err => {
+        console.warn(`Error attempting to enable full-screen mode: ${err.message}`);
+      });
+      setIsFullscreen(true);
+    } else {
+      document.exitFullscreen();
+      setIsFullscreen(false);
+    }
+  };
+
+  const handleDownload = (material: any) => {
+    const isHtml = material.type.includes("html") || material.type.includes("text");
+    let url = material.content;
+    
+    if (isHtml) {
+      const blob = new Blob([material.content], { type: 'text/html' });
+      url = URL.createObjectURL(blob);
+    }
+
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = material.name.includes('.') ? material.name : `${material.name}${isHtml ? '.html' : ''}`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    
+    if (isHtml) {
+      URL.revokeObjectURL(url);
+    }
+  };
+
+  const handleMaterialClick = (material: any) => {
+    setSelectedMaterial(material);
+    setIsSubmitted(false);
+    setResultForm({ firstName: "", lastName: "", telegramUsername: "", score: "" });
+    setTimeLeft(3600);
+    setIsTimerActive(true);
+    
+    // Use a slightly longer timeout to ensure the DOM is fully ready
+    setTimeout(() => {
+      if (viewerRef.current && !document.fullscreenElement) {
+        viewerRef.current.requestFullscreen().catch((err) => {
+          console.error("Fullscreen error:", err);
+        });
+      }
+    }, 300);
+  };
+
+  const handleBack = () => {
+    setSelectedMaterial(null);
+    setIsTimerActive(false);
+    if (document.fullscreenElement) {
+      document.exitFullscreen().catch(() => {});
+    }
+  };
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedMaterial) return;
+
+    submitResult({
+      ...resultForm,
+      materialId: selectedMaterial.id,
+      materialName: selectedMaterial.name
+    });
+    setIsSubmitted(true);
+    
+    if (document.fullscreenElement) {
+      document.exitFullscreen().catch(() => {});
+    }
+  };
+
+  return (
+    <div className="min-h-screen bg-[#f0f4f8] dark:bg-slate-950">
+      <AITutorModal 
+        isOpen={isAITutorOpen} 
+        onClose={() => setIsAITutorOpen(false)} 
+        initialContext={category}
+      />
+
+      <AnimatePresence mode="wait">
+        {!selectedMaterial ? (
+          <motion.div 
+            key="list"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+          >
+            {/* Header Section */}
+            <div className={`${sectionConfig.color} text-white py-12 md:py-16`}>
+              <div className="container mx-auto px-4 text-center">
+                <motion.div
+                  initial={{ opacity: 0, y: -20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="flex flex-col items-center gap-4"
+                >
+                  <div className="bg-white/20 p-4 rounded-full backdrop-blur-md">
+                    {sectionConfig.icon}
+                  </div>
+                  <h1 className="text-4xl md:text-5xl font-black tracking-tight">{sectionConfig.title}</h1>
+                  <p className="text-white/80 max-w-2xl mx-auto text-lg">
+                    {sectionConfig.subtitle}
+                  </p>
+                </motion.div>
+              </div>
+            </div>
+
+            {/* Writing Specific Sub-header */}
+            {sectionConfig.type === "writing" && (
+              <div className="bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 shadow-sm sticky top-16 z-40">
+                <div className="container mx-auto px-4 h-16 flex items-center justify-between">
+                  <div className="flex items-center gap-6">
+                    <Button asChild className="bg-red-600 hover:bg-red-700 text-white rounded-lg h-10 px-4">
+                      <Link to="/"><HomeIcon className="h-4 w-4 mr-2" /> Back Home</Link>
+                    </Button>
+                    <div className="flex items-center gap-2 text-sm font-medium text-slate-600 dark:text-slate-400">
+                      <LayoutGrid className="h-4 w-4 text-slate-400" />
+                      Available Question Sets: <span className="text-red-600 font-bold">{sectionMaterials.length}</span>
+                    </div>
+                  </div>
+                  <Button 
+                    onClick={() => setIsAITutorOpen(true)}
+                    className="bg-[#8b5cf6] hover:bg-[#7c3aed] text-white rounded-lg h-10"
+                  >
+                    <Bot className="h-4 w-4 mr-2" /> AI Essay Checker
+                  </Button>
+                </div>
+              </div>
+            )}
+
+            <div className="container mx-auto px-4 py-8">
+              <div className="flex flex-col lg:flex-row gap-8">
+                {/* Sidebar (Only for standard sections) */}
+                {sectionConfig.type === "standard" && (
+                  <aside className="w-full lg:w-64 space-y-6">
+                    <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-800 p-6">
+                      <h3 className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-6">Filter Tests</h3>
+                      <div className="space-y-2">
+                        {sidebarFilters.map((filter) => (
+                          <button
+                            key={filter.name}
+                            onClick={() => setActiveFilter(filter.name)}
+                            className={`w-full flex items-center justify-between p-3 rounded-xl transition-all text-sm font-medium ${
+                              activeFilter === filter.name
+                                ? `${sectionConfig.color} text-white shadow-lg shadow-blue-500/20`
+                                : "text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800"
+                            }`}
+                          >
+                            <div className="flex items-center gap-3">
+                              {filter.name === "All Tests" ? <LayoutGrid className="h-4 w-4" /> : <sectionConfig.sidebarIcon className="h-4 w-4" />}
+                              {filter.name}
+                            </div>
+                            <span className={`px-2 py-0.5 rounded-full text-[10px] ${
+                              activeFilter === filter.name ? "bg-white/20 text-white" : "bg-slate-100 dark:bg-slate-800 text-slate-500"
+                            }`}>
+                              {filter.count}
+                            </span>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div className="bg-gradient-to-br from-blue-600 to-violet-600 rounded-2xl p-6 text-white shadow-xl">
+                      <Sparkles className="h-8 w-8 mb-4 opacity-80" />
+                      <h4 className="font-bold text-lg mb-2">Need Help?</h4>
+                      <p className="text-sm text-white/80 mb-4">Our AI tutor can help you analyze your mistakes and improve your score.</p>
+                      <Button 
+                        onClick={() => setIsAITutorOpen(true)}
+                        variant="secondary" 
+                        className="w-full rounded-xl bg-white text-blue-600 hover:bg-white/90 border-none font-bold"
+                      >
+                        Ask AI Tutor
+                      </Button>
+                    </div>
+                  </aside>
+                )}
+
+                {/* Main Content */}
+                <main className="flex-1">
+                  {sectionConfig.type === "standard" && (
+                    <div className="flex flex-col md:flex-row md:items-center justify-between mb-8 gap-4">
+                      <div className="relative flex-1 max-w-md">
+                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+                        <input 
+                          type="text" 
+                          placeholder="Search materials..."
+                          value={searchQuery}
+                          onChange={(e) => setSearchQuery(e.target.value)}
+                          className="w-full pl-10 pr-4 py-3 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 focus:ring-2 focus:ring-blue-500 outline-none transition-all shadow-sm"
+                        />
+                      </div>
+                      <div className="flex items-center gap-2 text-sm text-slate-500 bg-white dark:bg-slate-900 px-4 py-2 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm">
+                        <TrendingUp className="h-4 w-4 text-green-500" />
+                        <span>{filteredMaterials.length} Materials Available</span>
+                      </div>
+                    </div>
+                  )}
+
+                  {filteredMaterials.length === 0 ? (
+                    <div className="text-center py-20 bg-white dark:bg-slate-900 rounded-3xl border-2 border-dashed border-slate-200 dark:border-slate-800">
+                      <div className="bg-slate-50 dark:bg-slate-800 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
+                        <Search className="h-8 w-8 text-slate-300" />
+                      </div>
+                      <h3 className="text-xl font-bold mb-2">No materials found</h3>
+                      <p className="text-slate-500">Try adjusting your search or filters.</p>
+                    </div>
+                  ) : (
+                    <div className={`grid grid-cols-1 ${sectionConfig.type === "writing" ? "md:grid-cols-3 xl:grid-cols-4" : "md:grid-cols-2 xl:grid-cols-3"} gap-6`}>
+                      {filteredMaterials.map((material, index) => (
+                        <motion.div
+                          key={material.id}
+                          initial={{ opacity: 0, y: 20 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          transition={{ delay: index * 0.05 }}
+                          className="group bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 overflow-hidden shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all duration-300"
+                        >
+                          {sectionConfig.type === "writing" ? (
+                            <div className="flex flex-col h-full">
+                              <div className="bg-red-600 p-4 text-white">
+                                <div className="flex items-center justify-between text-xs font-bold mb-1">
+                                  <span>{new Date(material.timestamp).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}</span>
+                                </div>
+                                <div className="flex items-center gap-2 text-xs opacity-90">
+                                  <FileText className="h-3 w-3" />
+                                  Practice Set
+                                </div>
+                              </div>
+                              <div className="p-6 flex-1 flex flex-col">
+                                <div className="aspect-video bg-slate-100 dark:bg-slate-800 rounded-xl mb-6 flex items-center justify-center overflow-hidden">
+                                  <FileText className="h-12 w-12 text-slate-300" />
+                                </div>
+                                <div className="space-y-4 mb-8">
+                                  <div>
+                                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2">Task 1:</p>
+                                    <div className="inline-flex items-center px-3 py-1.5 rounded-lg bg-blue-500 text-white text-[10px] font-bold">
+                                      <TrendingUp className="h-3 w-3 mr-1.5" />
+                                      {material.name.includes("Graph") ? "Line Graph" : "Table"}
+                                    </div>
+                                  </div>
+                                  <div>
+                                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2">Task 2:</p>
+                                    <div className="inline-flex items-center px-3 py-1.5 rounded-lg bg-red-600 text-white text-[10px] font-bold uppercase leading-tight">
+                                      <PenTool className="h-3 w-3 mr-1.5" />
+                                      To what extent do you agree or disagree?
+                                    </div>
+                                  </div>
+                                </div>
+                                <Button 
+                                  onClick={() => handleMaterialClick(material)}
+                                  className="w-full h-11 rounded-xl bg-red-600 hover:bg-red-700 text-white font-bold mt-auto"
+                                >
+                                  <Play className="h-4 w-4 mr-2 fill-current" />
+                                  Start Practice
+                                </Button>
+                              </div>
+                            </div>
+                          ) : (
+                            <div className="p-6">
+                              <div className="flex items-start justify-between mb-4">
+                                <div className={`px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider bg-green-100 text-green-600 dark:bg-green-900/30 dark:text-green-400 flex items-center gap-1`}>
+                                  <CheckCircle2 className="h-3 w-3" />
+                                  Free
+                                </div>
+                                {index < 3 && (
+                                  <div className="px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400">
+                                    New
+                                  </div>
+                                )}
+                              </div>
+                              
+                              <h3 className="text-lg font-bold text-slate-900 dark:text-white mb-2 line-clamp-2 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
+                                {material.name}
+                              </h3>
+                              
+                              <div className="flex items-center gap-4 text-xs text-slate-500 mb-6">
+                                <div className="flex items-center gap-1">
+                                  <Clock className="h-3 w-3" />
+                                  {category?.toLowerCase() === "books" || category?.toLowerCase() === "vocabulary" ? "Study Material" : "60 mins"}
+                                </div>
+                                <div className="flex items-center gap-1">
+                                  <FileText className="h-3 w-3" />
+                                  {material.subCategory || category}
+                                </div>
+                              </div>
+
+                              <Button 
+                                onClick={() => {
+                                  if (category?.toLowerCase() === "books") {
+                                    handleDownload(material);
+                                  } else {
+                                    handleMaterialClick(material);
+                                  }
+                                }}
+                                className={`w-full h-11 rounded-xl ${sectionConfig.buttonColor} text-white font-bold flex items-center justify-center gap-2 shadow-lg shadow-blue-500/10`}
+                              >
+                                {category?.toLowerCase() === "books" ? (
+                                  <><Download className="h-4 w-4" /> Download Book</>
+                                ) : (
+                                  <><Play className="h-4 w-4 fill-current" /> Start Test</>
+                                )}
+                              </Button>
+                            </div>
+                          )}
+                        </motion.div>
+                      ))}
+                    </div>
+                  )}
+                </main>
+              </div>
+            </div>
+          </motion.div>
+        ) : (
+          <motion.div 
+            key="viewer"
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.95 }}
+            className="container mx-auto py-8 px-4"
+          >
+            <Button 
+              variant="ghost" 
+              onClick={handleBack}
+              className="mb-6 hover:bg-slate-100 dark:hover:bg-slate-900 rounded-xl"
+            >
+              <ArrowLeft className="h-4 w-4 mr-2" /> Back to Materials
+            </Button>
+
+            {category?.toLowerCase() === "speaking" && (
+              <SpeakingControls />
+            )}
+
+            <div 
+              ref={viewerRef}
+              className={`relative bg-white dark:bg-slate-900 overflow-hidden shadow-2xl group/viewer flex flex-col ${isFullscreen ? "w-screen h-screen rounded-none" : "rounded-3xl border border-slate-200 dark:border-slate-800"}`}
+            >
+              {/* Header - Hide in fullscreen to give maximum space to the test */}
+              {!isFullscreen && (
+                <div className={`p-4 ${sectionConfig.color} text-white flex items-center justify-between shrink-0`}>
+                  <div className="flex items-center gap-3">
+                    {sectionConfig.icon}
+                    <div>
+                      <h2 className="font-bold">{selectedMaterial.name}</h2>
+                      <p className="text-xs opacity-80">IELTS {category} Practice</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <div className={`flex items-center gap-2 px-4 py-1.5 rounded-full font-mono font-bold text-lg ${timeLeft < 300 ? 'bg-red-500/20 text-red-200 animate-pulse' : 'bg-white/20 text-white'}`}>
+                      <Clock className="h-4 w-4" />
+                      {category?.toLowerCase() === "books" || category?.toLowerCase() === "vocabulary" ? "Study Mode" : formatTime(timeLeft)}
+                    </div>
+                    <Button 
+                      variant="secondary" 
+                      size="sm" 
+                      onClick={() => setIsAITutorOpen(true)}
+                      className="rounded-full bg-white/20 hover:bg-white/30 border-none text-white font-bold"
+                    >
+                      <Bot className="h-4 w-4 mr-2" /> Ask AI Tutor
+                    </Button>
+                    <Button 
+                      variant="secondary" 
+                      size="icon" 
+                      onClick={toggleFullscreen}
+                      className="rounded-full transition-opacity bg-white/20 hover:bg-white/30 border-none text-white opacity-0 group-hover/viewer:opacity-100"
+                    >
+                      <Maximize2 className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </div>
+              )}
+
+              {/* Fullscreen Controls (Floating) */}
+              {isFullscreen && (
+                <>
+                  <div className="absolute top-4 left-1/2 -translate-x-1/2 z-50">
+                    <div className={`flex items-center gap-3 px-6 py-2 rounded-full font-mono font-bold text-2xl backdrop-blur-md shadow-2xl border ${timeLeft < 300 ? 'bg-red-600/80 text-white border-red-400 animate-pulse' : 'bg-slate-900/80 text-white border-slate-700'}`}>
+                      <Clock className="h-6 w-6" />
+                      {category?.toLowerCase() === "books" || category?.toLowerCase() === "vocabulary" ? "Study Mode" : formatTime(timeLeft)}
+                    </div>
+                  </div>
+                  <div className="absolute top-4 right-4 z-50 flex gap-2 opacity-0 hover:opacity-100 transition-opacity">
+                    <Button 
+                      variant="secondary" 
+                      size="sm" 
+                      onClick={() => setIsAITutorOpen(true)}
+                      className="rounded-full bg-slate-900/50 hover:bg-slate-900/80 backdrop-blur-md border-none text-white font-bold"
+                    >
+                      <Bot className="h-4 w-4 mr-2" /> AI Tutor
+                    </Button>
+                    <Button 
+                      variant="secondary" 
+                      size="icon" 
+                      onClick={toggleFullscreen}
+                      className="rounded-full bg-slate-900/50 hover:bg-slate-900/80 backdrop-blur-md border-none text-white"
+                    >
+                      <Minimize2 className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </>
+              )}
+
+              {/* Progress Bar */}
+              <div className="w-full h-1.5 bg-slate-100 dark:bg-slate-800 shrink-0 relative z-50">
+                <motion.div 
+                  className={`h-full ${sectionConfig.color} shadow-[0_0_10px_rgba(0,0,0,0.1)]`}
+                  initial={{ width: 0 }}
+                  animate={{ width: `${progress}%` }}
+                  transition={{ duration: 0.5, ease: "linear" }}
+                />
+                {/* Progress markers for IELTS sections */}
+                <div className="absolute inset-0 flex justify-between pointer-events-none">
+                  {[25, 50, 75].map(marker => (
+                    <div key={marker} className="h-full w-px bg-white/20 dark:bg-slate-700/50" style={{ left: `${marker}%` }} />
+                  ))}
+                </div>
+              </div>
+
+              <div className="relative flex-1 min-h-0">
+                {selectedMaterial.type.includes("html") ? (
+                  <iframe 
+                    srcDoc={selectedMaterial.content} 
+                    className="w-full h-full border-none bg-white"
+                    title={selectedMaterial.name}
+                    tabIndex={-1}
+                  />
+                ) : (
+                  <div className="flex flex-col items-center justify-center p-12 text-center h-full">
+                    <FileText className={`h-20 w-20 ${sectionConfig.textColor} mb-6`} />
+                    <h3 className="text-2xl font-bold mb-4">File Material</h3>
+                    <p className="text-slate-500 mb-8 max-w-md">This is a downloadable material. Click the button below to view or download it.</p>
+                    <Button asChild size="lg" className={`${sectionConfig.buttonColor} text-white rounded-xl px-8`}>
+                      <a href={selectedMaterial.content} download={selectedMaterial.name}>Download File</a>
+                    </Button>
+                  </div>
+                )}
+              </div>
+
+              {/* Submission Form - Only show when not in fullscreen or at the bottom of scroll */}
+              {!isFullscreen && (
+                <div className="p-8 bg-slate-50 dark:bg-slate-900/50 border-t border-slate-200 dark:border-slate-800 shrink-0">
+                  <div className="max-w-2xl mx-auto">
+                    <div className="text-center mb-8">
+                      <h3 className="text-2xl font-bold mb-2">Submit Your Result</h3>
+                      <p className="text-slate-500">Record your score to track your progress over time.</p>
+                    </div>
+                    {isSubmitted ? (
+                      <div className="text-center py-8">
+                        <div className="w-16 h-16 bg-green-100 dark:bg-green-900/30 rounded-full flex items-center justify-center mx-auto mb-4">
+                          <CheckCircle2 className="h-8 w-8 text-green-600" />
+                        </div>
+                        <h3 className="text-xl font-bold text-slate-900 dark:text-white mb-2">Result Submitted!</h3>
+                        <p className="text-slate-500 mb-6">Your score has been recorded successfully.</p>
+                        <Button onClick={handleBack} variant="outline" className="rounded-xl">Back to Materials</Button>
+                      </div>
+                    ) : (
+                      <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div className="space-y-2">
+                          <label className="text-sm font-medium text-slate-700 dark:text-slate-300">First Name</label>
+                          <input 
+                            required
+                            type="text" 
+                            value={resultForm.firstName}
+                            onChange={(e) => setResultForm({...resultForm, firstName: e.target.value})}
+                            className="w-full px-4 py-3 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-800 focus:ring-2 focus:ring-blue-500 outline-none"
+                            placeholder="John"
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Last Name</label>
+                          <input 
+                            required
+                            type="text" 
+                            value={resultForm.lastName}
+                            onChange={(e) => setResultForm({...resultForm, lastName: e.target.value})}
+                            className="w-full px-4 py-3 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-800 focus:ring-2 focus:ring-blue-500 outline-none"
+                            placeholder="Doe"
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Telegram Username</label>
+                          <input 
+                            required
+                            type="text" 
+                            value={resultForm.telegramUsername}
+                            onChange={(e) => setResultForm({...resultForm, telegramUsername: e.target.value})}
+                            className="w-full px-4 py-3 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-800 focus:ring-2 focus:ring-blue-500 outline-none"
+                            placeholder="@username"
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Your Score</label>
+                          <input 
+                            required
+                            type="text" 
+                            value={resultForm.score}
+                            onChange={(e) => setResultForm({...resultForm, score: e.target.value})}
+                            className="w-full px-4 py-3 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-800 focus:ring-2 focus:ring-blue-500 outline-none"
+                            placeholder="e.g. 7.5"
+                          />
+                        </div>
+                        <div className="md:col-span-2 pt-4">
+                          <Button type="submit" className={`w-full h-12 rounded-xl ${sectionConfig.buttonColor} text-white text-lg font-bold shadow-lg`}>
+                            <Send className="h-5 w-5 mr-2" /> Submit Result
+                          </Button>
+                        </div>
+                      </form>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+}

@@ -1,0 +1,149 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // ===============================================================
+    // Assumed Data Model
+    // ===============================================================
+    //
+    // Collection: users
+    // Document ID: userId (auth.uid)
+    // Fields:
+    //   - uid: string (required) - The user's unique ID
+    //   - email: string (required) - The user's email address
+    //   - premiumStatus: string (required, enum: ['none', 'pending', 'approved']) - Premium access status
+    //   - expiryDate: number (optional) - Timestamp for premium expiration
+    //   - role: string (required, enum: ['user', 'admin']) - User role
+    //   - displayName: string (optional) - The user's display name
+    //   - createdAt: string (optional) - ISO date string
+    //
+    // Collection: requests
+    // Document ID: requestId (random)
+    // Fields:
+    //   - username: string (required) - The requester's username
+    //   - status: string (required, enum: ['pending', 'approved', 'rejected']) - Request status
+    //   - timestamp: number (required) - Request creation time
+    //   - expiryDate: number (optional) - Expiration time if approved
+    //   - uid: string (required) - The requester's UID
+    //
+    // Collection: materials
+    // Document ID: materialId (random)
+    // Fields:
+    //   - category: string (required, enum: ['Listening', 'Reading', 'Writing', 'Speaking', 'Books', 'Vocabulary'])
+    //   - name: string (required)
+    //   - type: string (required)
+    //   - content: string (required)
+    //   - timestamp: number (required)
+    //
+    // Collection: results
+    // Document ID: resultId (random)
+    // Fields:
+    //   - firstName: string (required)
+    //   - lastName: string (required)
+    //   - telegramUsername: string (required)
+    //   - materialId: string (required)
+    //   - materialName: string (required)
+    //   - score: string (required)
+    //   - timestamp: number (required)
+    //
+    // ===============================================================
+
+    // ===============================================================
+    // Helper Functions
+    // ===============================================================
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    function isAdmin() {
+      return isAuthenticated() &&
+        (request.auth.token.email == "shohruxmuminov201@gmail.com" ||
+         (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
+          get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin'));
+    }
+
+    function isValidEmail(email) {
+      return email is string && email.matches("^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$");
+    }
+
+    function hasOnlyAllowedFields(fields) {
+      return request.resource.data.keys().hasOnly(fields);
+    }
+
+    // ===============================================================
+    // Domain Validators
+    // ===============================================================
+    function isValidUser(data) {
+      return hasOnlyAllowedFields(['uid', 'email', 'premiumStatus', 'expiryDate', 'role', 'displayName', 'createdAt']) &&
+             data.uid == request.auth.uid &&
+             isValidEmail(data.email) &&
+             data.premiumStatus in ['none', 'pending', 'approved'] &&
+             data.role in ['user', 'admin'] &&
+             (data.displayName is string || !('displayName' in data)) &&
+             (data.createdAt is string || !('createdAt' in data)) &&
+             (data.expiryDate is number || data.expiryDate == null || !('expiryDate' in data));
+    }
+
+    function isValidRequest(data) {
+      return hasOnlyAllowedFields(['username', 'status', 'timestamp', 'expiryDate', 'uid']) &&
+             data.username is string && data.username.size() > 0 &&
+             data.status in ['pending', 'approved', 'rejected'] &&
+             data.timestamp is number &&
+             data.uid is string;
+    }
+
+    function isValidMaterial(data) {
+      return hasOnlyAllowedFields(['category', 'subCategory', 'name', 'type', 'content', 'timestamp']) &&
+             data.category in ['Listening', 'Reading', 'Writing', 'Speaking', 'Books', 'Vocabulary'] &&
+             (!('subCategory' in data) || data.subCategory in ['Listening', 'Reading', 'Writing', 'Speaking']) &&
+             data.name is string && data.name.size() > 0 &&
+             data.type is string &&
+             data.content is string &&
+             data.timestamp is number;
+    }
+
+    function isValidResult(data) {
+      return hasOnlyAllowedFields(['firstName', 'lastName', 'telegramUsername', 'materialId', 'materialName', 'score', 'timestamp']) &&
+             data.firstName is string && data.firstName.size() > 0 &&
+             data.lastName is string && data.lastName.size() > 0 &&
+             data.telegramUsername is string &&
+             data.materialId is string &&
+             data.materialName is string &&
+             data.score is string &&
+             data.timestamp is number;
+    }
+
+    // ===============================================================
+    // Rules
+    // ===============================================================
+
+    match /users/{userId} {
+      allow read: if isOwner(userId) || isAdmin();
+      allow create: if isAuthenticated() && isValidUser(request.resource.data) && (request.resource.data.role == 'user' || isAdmin());
+      allow update: if isAuthenticated() && isValidUser(request.resource.data) && ((isOwner(userId) && request.resource.data.role == resource.data.role) || isAdmin());
+    }
+
+    match /requests/{requestId} {
+      allow read: if isAdmin();
+      allow create: if isAuthenticated() && isValidRequest(request.resource.data) && request.resource.data.uid == request.auth.uid;
+      allow update: if isAdmin() && isValidRequest(request.resource.data);
+      allow delete: if isAdmin();
+    }
+
+    match /materials/{materialId} {
+      allow read: if isAuthenticated();
+      allow create, update: if isAdmin() && isValidMaterial(request.resource.data);
+      allow delete: if isAdmin();
+    }
+
+    match /results/{resultId} {
+      allow read: if isAdmin();
+      allow create: if isAuthenticated() && isValidResult(request.resource.data);
+      allow update: if isAdmin() && isValidResult(request.resource.data);
+      allow delete: if isAdmin();
+    }
+  }
+}

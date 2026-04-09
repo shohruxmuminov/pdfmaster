@@ -1,6 +1,6 @@
 import ToolLayout from "@/src/components/ToolLayout";
-import mammoth from "mammoth";
-import { PDFDocument, StandardFonts, rgb } from "pdf-lib";
+import { renderAsync } from "docx-preview";
+import html2pdf from "html2pdf.js";
 
 export default function WordToPDF() {
   const handleConvert = async (files: File[]) => {
@@ -11,87 +11,82 @@ export default function WordToPDF() {
     const file = files[0];
     const arrayBuffer = await file.arrayBuffer();
     
-    // Extract raw text from the Word document
-    const result = await mammoth.extractRawText({ arrayBuffer });
-    let text = result.value;
+    // Create a temporary container to hold the rendered Word document
+    const container = document.createElement("div");
     
-    if (!text) {
-      throw new Error("Could not extract text from the document or document is empty.");
-    }
+    // Apply some basic styling to make it look like a document
+    container.style.padding = "0";
+    container.style.margin = "0";
+    container.style.width = "210mm"; // A4 width
+    container.style.background = "#fff";
+    container.style.position = "absolute";
+    container.style.left = "-9999px";
+    container.style.top = "-9999px";
+    document.body.appendChild(container);
 
-    // Sanitize text for WinAnsi encoding (StandardFonts.Helvetica)
-    text = text
-      .replace(/[\u2018\u2019\u02BC\u02BB\u0060\u00B4]/g, "'") // Smart single quotes and modifier commas
-      .replace(/[\u201C\u201D]/g, '"') // Smart double quotes
-      .replace(/[\u2013\u2014]/g, '-') // En and em dashes
-      .replace(/[\u2026]/g, '...') // Ellipsis
-      .replace(/[^\x00-\x7F\xA0-\xFF\n\r\t]/g, ''); // Remove other unsupported characters
-
-    // Create PDF
-    const pdfDoc = await PDFDocument.create();
-    const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
-    
-    const fontSize = 12;
-    const margin = 50;
-    const width = 595.28; // A4 width
-    const height = 841.89; // A4 height
-    const maxWidth = width - margin * 2;
-    
-    // Simple text wrapping
-    const words = text.split(/\s+/);
-    let lines: string[] = [];
-    let currentLine = words[0] || "";
-
-    for (let i = 1; i < words.length; i++) {
-      const word = words[i];
-      const textWidth = font.widthOfTextAtSize(currentLine + " " + word, fontSize);
-      if (textWidth < maxWidth) {
-        currentLine += " " + word;
-      } else {
-        lines.push(currentLine);
-        currentLine = word;
-      }
-    }
-    lines.push(currentLine);
-
-    // Handle newlines from original text
-    const finalLines: string[] = [];
-    lines.forEach(line => {
-      const splitByNewline = line.split('\n');
-      finalLines.push(...splitByNewline);
-    });
-
-    let page = pdfDoc.addPage([width, height]);
-    let y = height - margin;
-
-    for (const line of finalLines) {
-      if (y < margin) {
-        page = pdfDoc.addPage([width, height]);
-        y = height - margin;
-      }
-      page.drawText(line, {
-        x: margin,
-        y,
-        size: fontSize,
-        font,
-        color: rgb(0, 0, 0),
+    try {
+      // Render the .docx file into the container using docx-preview
+      await renderAsync(arrayBuffer, container, undefined, {
+        className: "docx-preview",
+        inWrapper: false,
+        ignoreWidth: false,
+        ignoreHeight: false,
+        ignoreLastRenderedPageBreak: false,
+        experimental: true,
+        trimXmlDeclaration: true,
+        useBase64URL: true,
       });
-      y -= fontSize + 4; // line height
-    }
 
-    const pdfBytes = await pdfDoc.save();
-    const blob = new Blob([pdfBytes], { type: "application/pdf" });
-    
-    return {
-      blob,
-      filename: `${file.name.replace('.docx', '')}.pdf`
-    };
+      // Wait for all images in the container to load
+      const images = container.getElementsByTagName('img');
+      const imagePromises = Array.from(images).map(img => {
+        if (img.complete) return Promise.resolve();
+        return new Promise(resolve => {
+          img.onload = resolve;
+          img.onerror = resolve;
+        });
+      });
+      await Promise.all(imagePromises);
+
+      // Wait a bit more for any fonts or complex layouts
+      await new Promise(resolve => setTimeout(resolve, 2000));
+
+      // Configure html2pdf options
+      const opt = {
+        margin:       0,
+        filename:     `${file.name.replace('.docx', '')}.pdf`,
+        image:        { type: 'jpeg' as const, quality: 1.0 },
+        html2canvas:  { 
+          scale: 2, 
+          useCORS: true,
+          logging: false,
+          allowTaint: true,
+        },
+        jsPDF:        { unit: 'mm' as const, format: 'a4' as const, orientation: 'portrait' as const }
+      };
+
+      // Generate PDF as a blob
+      const pdfBlob = await html2pdf().set(opt).from(container).output('blob');
+      
+      return {
+        blob: pdfBlob,
+        filename: opt.filename
+      };
+    } catch (error) {
+      console.error("Conversion error:", error);
+      throw new Error("Failed to convert Word document. The file might be too complex or corrupted.");
+    } finally {
+      // Clean up the temporary container
+      if (document.body.contains(container)) {
+        document.body.removeChild(container);
+      }
+    }
   };
 
   return (
     <ToolLayout
       title="Word to PDF"
-      description="Convert Word documents (.docx) into PDF files easily."
+      description="Convert Word documents (.docx) into PDF files with high fidelity, preserving layout and images."
       accept={{ "application/vnd.openxmlformats-officedocument.wordprocessingml.document": [".docx"] }}
       maxFiles={1}
       actionButtonText="Convert to PDF"

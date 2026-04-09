@@ -1,5 +1,5 @@
 {
-  "name": "PDFMaster",
-  "description": "A fast, clean PDF tools website to convert, compress, and manage PDFs instantly.",
-  "requestFramePermissions": []
+  "name": "IELTS.net",
+  "description": "The ultimate IELTS preparation platform with Listening, Reading, Writing, and Speaking materials.",
+  "requestFramePermissions": ["microphone"]
 }

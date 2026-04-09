@@ -5,15 +5,15 @@ export function useUser() {
   const [usageCount, setUsageCount] = useState(0);
 
   useEffect(() => {
-    const premium = localStorage.getItem('pdfmaster_premium') === 'true';
-    const usage = parseInt(localStorage.getItem('pdfmaster_usage') || '0', 10);
+    const premium = localStorage.getItem('ieltsaid_premium') === 'true';
+    const usage = parseInt(localStorage.getItem('ieltsaid_usage') || '0', 10);
     setIsPremium(premium);
     setUsageCount(usage);
   }, []);
 
   const activatePremium = (code: string) => {
     if (code === '2010') {
-      localStorage.setItem('pdfmaster_premium', 'true');
+      localStorage.setItem('ieltsaid_premium', 'true');
       setIsPremium(true);
       return true;
     }
@@ -23,7 +23,7 @@ export function useUser() {
   const incrementUsage = () => {
     if (!isPremium) {
       const newUsage = usageCount + 1;
-      localStorage.setItem('pdfmaster_usage', newUsage.toString());
+      localStorage.setItem('ieltsaid_usage', newUsage.toString());
       setUsageCount(newUsage);
     }
   };

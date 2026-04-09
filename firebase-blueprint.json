@@ -1,0 +1,77 @@
+{
+  "entities": {
+    "UserProfile": {
+      "title": "User Profile",
+      "description": "Stores user information and premium status.",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string", "description": "The unique ID of the user." },
+        "email": { "type": "string", "format": "email", "description": "The user's email address." },
+        "premiumStatus": { "type": "string", "enum": ["none", "pending", "approved"], "description": "The user's premium status." },
+        "expiryDate": { "type": "number", "description": "The timestamp when the premium status expires." },
+        "role": { "type": "string", "enum": ["user", "admin"], "description": "The user's role." }
+      },
+      "required": ["uid", "email", "premiumStatus", "role"]
+    },
+    "PremiumRequest": {
+      "title": "Premium Request",
+      "description": "A request for premium access.",
+      "type": "object",
+      "properties": {
+        "username": { "type": "string", "description": "The username of the requester." },
+        "status": { "type": "string", "enum": ["pending", "approved", "rejected"], "description": "The status of the request." },
+        "timestamp": { "type": "number", "description": "The timestamp of the request." },
+        "expiryDate": { "type": "number", "description": "The timestamp when the request expires (if approved)." }
+      },
+      "required": ["username", "status", "timestamp"]
+    },
+    "Material": {
+      "title": "IELTS Material",
+      "description": "Learning materials uploaded by the admin.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "category": { "type": "string", "enum": ["Listening", "Reading", "Writing", "Speaking", "Books", "Vocabulary"] },
+        "name": { "type": "string" },
+        "type": { "type": "string" },
+        "content": { "type": "string" },
+        "timestamp": { "type": "number" }
+      },
+      "required": ["id", "category", "name", "type", "content", "timestamp"]
+    },
+    "UserResult": {
+      "title": "User Test Result",
+      "description": "Results of practice tests submitted by users.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "firstName": { "type": "string" },
+        "lastName": { "type": "string" },
+        "telegramUsername": { "type": "string" },
+        "materialId": { "type": "string" },
+        "materialName": { "type": "string" },
+        "score": { "type": "string" },
+        "timestamp": { "type": "number" }
+      },
+      "required": ["id", "firstName", "lastName", "telegramUsername", "materialId", "materialName", "score", "timestamp"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "UserProfile",
+      "description": "User profiles."
+    },
+    "/requests/{requestId}": {
+      "schema": "PremiumRequest",
+      "description": "Premium access requests."
+    },
+    "/materials/{materialId}": {
+      "schema": "Material",
+      "description": "IELTS learning materials."
+    },
+    "/results/{resultId}": {
+      "schema": "UserResult",
+      "description": "User test results."
+    }
+  }
+}
