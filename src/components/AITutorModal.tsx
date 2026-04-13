@@ -26,8 +26,8 @@ export function AITutorModal({ isOpen, onClose, initialContext }: AITutorModalPr
   useEffect(() => {
     if (isOpen && messages.length === 0) {
       const welcomeMessage = initialContext 
-        ? `Hello! I'm your AI IELTS Tutor. I see you're practicing ${initialContext}. How can I help you today?`
-        : "Hello! I'm your AI IELTS Tutor. How can I help you with your IELTS preparation today?";
+        ? `Hello! I'm Gemini AI. I see you're practicing ${initialContext}. How can I help you today?`
+        : "Hello! I'm Gemini AI. How can I help you with your IELTS preparation today?";
       
       setMessages([{ role: "assistant", content: welcomeMessage }]);
     }
@@ -52,15 +52,15 @@ export function AITutorModal({ isOpen, onClose, initialContext }: AITutorModalPr
     setMessages(prev => [...prev, { role: "assistant", content: "" }]);
 
     try {
-      const systemInstruction = `You are a professional IELTS tutor on the IELTS.net platform. 
+      const systemInstruction = `You are Gemini AI, a professional IELTS expert on the IELTS.net platform. 
       Your goal is to help students achieve Band 8+ scores. 
       Be encouraging, precise, and provide actionable feedback. 
       If the user is practicing a specific section (${initialContext || "IELTS"}), focus your advice on that.
       Keep responses concise but comprehensive. Use Markdown for formatting (bolding, lists, etc.) to make advice clear.`;
 
       // Construct a more structured history for the prompt
-      const history = newMessages.map(m => `${m.role === "user" ? "Student" : "Tutor"}: ${m.content}`).join("\n");
-      const prompt = `${history}\nTutor:`;
+      const history = newMessages.map(m => `${m.role === "user" ? "Student" : "Gemini AI"}: ${m.content}`).join("\n");
+      const prompt = `${history}\nGemini AI:`;
       
       const stream = await generateAIResponseStream(prompt, systemInstruction);
       
@@ -113,7 +113,7 @@ export function AITutorModal({ isOpen, onClose, initialContext }: AITutorModalPr
                   <Bot className="h-6 w-6" />
                 </div>
                 <div>
-                  <h3 className="font-bold text-lg">AI IELTS Tutor</h3>
+                  <h3 className="font-bold text-lg">Gemini AI</h3>
                   <p className="text-xs text-white/80">Powered by Gemini AI</p>
                 </div>
               </div>
@@ -167,7 +167,7 @@ export function AITutorModal({ isOpen, onClose, initialContext }: AITutorModalPr
                     </div>
                     <div className="p-4 rounded-2xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 flex items-center gap-2">
                       <Loader2 className="h-4 w-4 animate-spin text-blue-600" />
-                      <span className="text-xs text-slate-500">Tutor is thinking...</span>
+                      <span className="text-xs text-slate-500">Gemini is thinking...</span>
                     </div>
                   </div>
                 </div>
@@ -182,7 +182,7 @@ export function AITutorModal({ isOpen, onClose, initialContext }: AITutorModalPr
                   value={input}
                   onChange={(e) => setInput(e.target.value)}
                   onKeyDown={(e) => e.key === "Enter" && handleSend()}
-                  placeholder="Ask your tutor anything..."
+                  placeholder="Ask Gemini AI anything..."
                   className="flex-1 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl px-5 py-3 pr-12 text-sm focus:ring-2 focus:ring-blue-500 outline-none transition-all"
                 />
                 <button

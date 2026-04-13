@@ -1,5 +1,5 @@
 import { Link, Outlet, useLocation, useNavigate } from "react-router-dom";
-import { FileText, Menu, X, Github, Twitter, Calendar, LogOut, User as UserIcon, LogIn } from "lucide-react";
+import { FileText, Menu, X, Github, Twitter, Calendar, LogOut, User as UserIcon, LogIn, Shield } from "lucide-react";
 import { useState, useEffect } from "react";
 import { Button } from "@/src/components/ui/button";
 import { ThemeToggle } from "./ThemeToggle";
@@ -13,7 +13,7 @@ export default function Layout() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
   const [isCalendarOpen, setIsCalendarOpen] = useState(false);
-  const { user } = useGemini();
+  const { user, role } = useGemini();
   const location = useLocation();
   const navigate = useNavigate();
 
@@ -95,10 +95,17 @@ export default function Layout() {
             {user ? (
               <div className="flex items-center gap-3">
                 <Button asChild variant="ghost" className="rounded-full p-2 h-10 w-10">
-                  <Link to="/admin" title="Admin Panel">
+                  <Link to="/settings" title="Profile Settings">
                     <UserIcon className="h-5 w-5" />
                   </Link>
                 </Button>
+                {(role === "admin" || role === "teacher") && (
+                  <Button asChild variant="ghost" className="rounded-full p-2 h-10 w-10 text-blue-600">
+                    <Link to={role === "admin" ? "/admin" : "/teacher"} title={`${role === "admin" ? "Admin" : "Teacher"} Panel`}>
+                      <Shield className="h-5 w-5" />
+                    </Link>
+                  </Button>
+                )}
                 <Button 
                   onClick={handleLogout}
                   variant="ghost" 
@@ -236,6 +243,7 @@ export default function Layout() {
               <h3 className="font-semibold text-white mb-6">Platform</h3>
               <ul className="space-y-3 text-sm">
                 <li><Link to="/admin" className="hover:text-blue-400 transition-colors">Admin Panel</Link></li>
+                <li><Link to="/teacher" className="hover:text-blue-400 transition-colors">Teacher Panel</Link></li>
                 <li><a href="#" className="hover:text-blue-400 transition-colors">Privacy Policy</a></li>
                 <li><a href="#" className="hover:text-blue-400 transition-colors">Terms of Service</a></li>
               </ul>

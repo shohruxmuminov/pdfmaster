@@ -1,37 +1,101 @@
-import React, { useState, useRef, useEffect } from "react";
+import React, { useState, useRef, useEffect, useMemo } from "react";
 import { useGemini } from "@/src/components/GeminiContext";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/src/components/ui/card";
 import { Button } from "@/src/components/ui/button";
-import { Shield, Check, X, Clock, User, Lock, AlertCircle, Plus, Trash2, FileText, Upload, Eye, List, LogIn } from "lucide-react";
+import { Shield, Check, X, Clock, User, Lock, AlertCircle, Plus, Trash2, FileText, Upload, Eye, List, LogIn, Loader2 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useNavigate } from "react-router-dom";
 
 export default function AdminPanel() {
-  const { user, allRequests, approveRequest, rejectRequest, materials, addMaterial, deleteMaterial, results, premiumStatus } = useGemini();
+  const { 
+    user, 
+    role, 
+    allRequests, 
+    approveRequest, 
+    rejectRequest, 
+    materials, 
+    addMaterial, 
+    deleteMaterial, 
+    results, 
+    transcriptions, 
+    premiumStatus, 
+    grantPremiumStatus,
+    isMockTestEnabled,
+    setMockTestAccess
+  } = useGemini();
   const [adminCode, setAdminCode] = useState("");
   const [isCodeAuthenticated, setIsCodeAuthenticated] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
   const [error, setError] = useState("");
-  const [activeTab, setActiveTab] = useState<"requests" | "materials" | "results">("requests");
+  const [success, setSuccess] = useState("");
+  const [activeTab, setActiveTab] = useState<"requests" | "materials" | "results" | "transcriptions">("requests");
   const navigate = useNavigate();
   
+  useEffect(() => {
+    if (role === "admin") {
+      setIsCodeAuthenticated(true);
+    }
+  }, [role]);
+
   // Material Form State
   const [materialForm, setMaterialForm] = useState({ 
     name: "", 
     category: "Listening" as any,
-    subCategory: "Listening" as any
+    subCategory: "Listening" as any,
+    mockTestId: ""
   });
+
+  // Calculate next mock test number
+  const nextMockNumber = useMemo(() => {
+    const mockTests = materials.filter(m => m.category === "Mock Tests");
+    const ids = mockTests.map(m => {
+      const match = m.mockTestId?.match(/Mock Test (\d+)/);
+      return match ? parseInt(match[1]) : 0;
+    });
+    return ids.length > 0 ? Math.max(...ids) + 1 : 1;
+  }, [materials]);
+
+  useEffect(() => {
+    if (materialForm.category === "Mock Tests") {
+      setMaterialForm(prev => ({
+        ...prev,
+        name: `Mock Test ${nextMockNumber}`,
+        mockTestId: `Mock Test ${nextMockNumber}`
+      }));
+    }
+  }, [materialForm.category, nextMockNumber]);
+
   const [fileContent, setFileContent] = useState<string | null>(null);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [fileName, setFileName] = useState("");
   const [fileType, setFileType] = useState("");
+  const [mockTestFiles, setMockTestFiles] = useState<{
+    Listening: File | null;
+    Reading: File | null;
+    Writing: File | null;
+  }>({
+    Listening: null,
+    Reading: null,
+    Writing: null
+  });
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Approval State
   const [expiryDays, setExpiryDays] = useState("30");
 
-  const handleLogin = () => {
+  const handleLogin = async () => {
     if (adminCode === "2424") {
-      setIsCodeAuthenticated(true);
       setError("");
+      if (user) {
+        try {
+          await grantPremiumStatus(user.uid, "admin");
+          setIsCodeAuthenticated(true);
+        } catch (err) {
+          setError("Failed to grant admin status. Please try again.");
+        }
+      } else {
+        setError("You must be logged in to access the admin panel.");
+      }
     } else {
       setError("Invalid admin code.");
     }
@@ -41,6 +105,7 @@ export default function AdminPanel() {
     const file = e.target.files?.[0];
     if (!file) return;
 
+    setSelectedFile(file);
     setFileType(file.type);
     setFileName(file.name);
     const reader = new FileReader();
@@ -55,24 +120,69 @@ export default function AdminPanel() {
     }
   };
 
-  const handleAddMaterial = (e: React.FormEvent) => {
+  const handleAddMaterial = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!fileContent) return;
-
-    const isAutoName = materialForm.category === "Books" || materialForm.category === "Vocabulary";
+    setIsUploading(true);
+    setError("");
     
-    addMaterial({
-      name: isAutoName ? fileName : materialForm.name,
-      category: materialForm.category,
-      subCategory: materialForm.category === "Books" ? materialForm.subCategory : undefined,
-      type: fileType,
-      content: fileContent
-    });
+    try {
+      if (materialForm.category === "Mock Tests") {
+        const sections = ["Listening", "Reading", "Writing"] as const;
+        const mockName = `Mock Test ${nextMockNumber}`;
+        const uploadPromises = sections.map(async (section) => {
+          const file = mockTestFiles[section];
+          if (file) {
+            return addMaterial({
+              name: `${mockName} - ${section}`,
+              category: "Mock Tests",
+              subCategory: section,
+              mockTestId: mockName,
+              type: file.type,
+              content: ""
+            }, file);
+          }
+        });
+        await Promise.all(uploadPromises);
+      } else {
+        if (!selectedFile) {
+          setError("Please select a file first.");
+          setIsUploading(false);
+          return;
+        }
+        const isAutoName = materialForm.category === "Books" || materialForm.category === "Vocabulary";
+        
+        await addMaterial({
+          name: isAutoName ? fileName : materialForm.name,
+          category: materialForm.category,
+          subCategory: (materialForm.category === "Books") ? materialForm.subCategory : undefined,
+          mockTestId: undefined,
+          type: fileType,
+          content: ""
+        }, selectedFile);
+      }
 
-    setMaterialForm({ name: "", category: "Listening", subCategory: "Listening" });
-    setFileContent(null);
-    setFileName("");
-    if (fileInputRef.current) fileInputRef.current.value = "";
+      setMaterialForm({ name: "", category: "Listening", subCategory: "Listening", mockTestId: "" });
+      setFileContent(null);
+      setSelectedFile(null);
+      setFileName("");
+      setMockTestFiles({ Listening: null, Reading: null, Writing: null });
+      if (fileInputRef.current) fileInputRef.current.value = "";
+      setError("");
+      setSuccess("Material uploaded successfully!");
+      setTimeout(() => setSuccess(""), 5000);
+    } catch (err: any) {
+      console.error("Error adding material:", err);
+      let message = "Failed to add material.";
+      try {
+        const parsed = JSON.parse(err.message);
+        message = `Error: ${parsed.error} (${parsed.operationType} on ${parsed.path})`;
+      } catch {
+        message = err.message || "Failed to add material. Please check file size and permissions.";
+      }
+      setError(message);
+    } finally {
+      setIsUploading(false);
+    }
   };
 
   if (!user) {
@@ -151,6 +261,37 @@ export default function AdminPanel() {
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-950 py-12 px-4">
       <div className="container mx-auto max-w-6xl">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+          <Card className="md:col-span-3 border-slate-200 dark:border-slate-800 rounded-3xl shadow-sm overflow-hidden">
+            <CardHeader className="bg-slate-900 text-white py-4 px-6 flex flex-row items-center justify-between">
+              <div>
+                <CardTitle className="text-lg font-bold">Global Settings</CardTitle>
+                <CardDescription className="text-slate-400 text-xs">Control platform-wide features</CardDescription>
+              </div>
+              <Shield className="h-5 w-5 text-blue-500" />
+            </CardHeader>
+            <CardContent className="p-6">
+              <div className="flex items-center justify-between p-4 bg-slate-50 dark:bg-slate-800/50 rounded-2xl border border-slate-100 dark:border-slate-800">
+                <div className="flex items-center gap-4">
+                  <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${isMockTestEnabled ? 'bg-green-100 text-green-600' : 'bg-red-100 text-red-600'}`}>
+                    {isMockTestEnabled ? <Eye className="h-6 w-6" /> : <Lock className="h-6 w-6" />}
+                  </div>
+                  <div>
+                    <h3 className="font-bold text-slate-900 dark:text-white">Mock Test Access</h3>
+                    <p className="text-xs text-slate-500">Enable or disable mock test access for all students</p>
+                  </div>
+                </div>
+                <Button 
+                  onClick={() => setMockTestAccess(!isMockTestEnabled)}
+                  className={`rounded-xl px-6 font-bold ${isMockTestEnabled ? 'bg-red-600 hover:bg-red-700' : 'bg-green-600 hover:bg-green-700'} text-white`}
+                >
+                  {isMockTestEnabled ? "Disable Access" : "Enable Access"}
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
         <div className="flex flex-col md:flex-row md:items-center justify-between mb-12 gap-6">
           <div>
             <h1 className="text-4xl font-extrabold text-slate-900 dark:text-white mb-2">Admin Dashboard</h1>
@@ -177,6 +318,13 @@ export default function AdminPanel() {
               className="rounded-xl px-6"
             >
               Results
+            </Button>
+            <Button 
+              variant={activeTab === "transcriptions" ? "default" : "ghost"} 
+              onClick={() => setActiveTab("transcriptions")}
+              className="rounded-xl px-6"
+            >
+              Transcriptions
             </Button>
           </div>
         </div>
@@ -288,6 +436,18 @@ export default function AdminPanel() {
                     <CardDescription>Add HTML or other files to IELTS sections.</CardDescription>
                   </CardHeader>
                   <CardContent className="p-8">
+                    {error && (
+                      <div className="mb-6 flex items-center gap-2 text-red-600 dark:text-red-400 text-sm bg-red-50 dark:bg-red-900/20 p-4 rounded-xl border border-red-100 dark:border-red-900/30">
+                        <AlertCircle className="h-5 w-5 shrink-0" />
+                        <p className="font-medium">{error}</p>
+                      </div>
+                    )}
+                    {success && (
+                      <div className="mb-6 flex items-center gap-2 text-green-600 dark:text-green-400 text-sm bg-green-50 dark:bg-green-900/20 p-4 rounded-xl border border-green-100 dark:border-green-900/30">
+                        <Check className="h-5 w-5 shrink-0" />
+                        <p className="font-medium">{success}</p>
+                      </div>
+                    )}
                     <form onSubmit={handleAddMaterial} className="grid grid-cols-1 md:grid-cols-2 gap-6">
                       <div className="space-y-2">
                         <label className="text-sm font-medium">Category</label>
@@ -302,6 +462,7 @@ export default function AdminPanel() {
                           <option value="Speaking">Speaking</option>
                           <option value="Books">My Premium Books</option>
                           <option value="Vocabulary">Premium Vocabulary</option>
+                          <option value="Mock Tests">Full Mock Tests</option>
                         </select>
                       </div>
 
@@ -321,7 +482,7 @@ export default function AdminPanel() {
                         </div>
                       )}
 
-                      {materialForm.category !== "Books" && materialForm.category !== "Vocabulary" && (
+                      {materialForm.category !== "Books" && materialForm.category !== "Vocabulary" && materialForm.category !== "Mock Tests" && (
                         <div className="space-y-2">
                           <label className="text-sm font-medium">Material Name</label>
                           <input 
@@ -335,25 +496,72 @@ export default function AdminPanel() {
                         </div>
                       )}
 
-                      <div className="md:col-span-2 space-y-2">
-                        <label className="text-sm font-medium">File (HTML preferred for auto-rendering)</label>
-                        <div 
-                          onClick={() => fileInputRef.current?.click()}
-                          className="w-full h-32 border-2 border-dashed border-slate-200 dark:border-slate-800 rounded-2xl flex flex-col items-center justify-center cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-900 transition-all"
-                        >
-                          <Upload className="h-8 w-8 text-slate-400 mb-2" />
-                          <p className="text-sm text-slate-500">{fileContent ? `Selected: ${fileName}` : "Click to select file"}</p>
-                          <input 
-                            ref={fileInputRef}
-                            type="file" 
-                            className="hidden" 
-                            onChange={handleFileChange}
-                          />
+                      {materialForm.category === "Mock Tests" ? (
+                        <div className="md:col-span-2 space-y-4">
+                          <label className="text-sm font-medium">Mock Test Files (Select for each section)</label>
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            {(["Listening", "Reading", "Writing"] as const).map((section) => (
+                              <div key={section} className="space-y-2">
+                                <p className="text-xs font-bold text-slate-500 uppercase">{section}</p>
+                                <div 
+                                  onClick={() => {
+                                    const input = document.createElement("input");
+                                    input.type = "file";
+                                    input.onchange = (e: any) => {
+                                      const file = e.target.files?.[0];
+                                      if (file) {
+                                        setMockTestFiles(prev => ({ ...prev, [section]: file }));
+                                      }
+                                    };
+                                    input.click();
+                                  }}
+                                  className="w-full p-4 border-2 border-dashed border-slate-200 dark:border-slate-800 rounded-xl flex items-center gap-3 cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-900 transition-all"
+                                >
+                                  <Upload className="h-4 w-4 text-slate-400" />
+                                  <span className="text-sm truncate">
+                                    {mockTestFiles[section] ? mockTestFiles[section]?.name : `Select ${section} file`}
+                                  </span>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
                         </div>
-                      </div>
+                      ) : (
+                        <div className="md:col-span-2 space-y-2">
+                          <label className="text-sm font-medium">File (HTML preferred for auto-rendering)</label>
+                          <div 
+                            onClick={() => fileInputRef.current?.click()}
+                            className="w-full h-32 border-2 border-dashed border-slate-200 dark:border-slate-800 rounded-2xl flex flex-col items-center justify-center cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-900 transition-all"
+                          >
+                            <Upload className="h-8 w-8 text-slate-400 mb-2" />
+                            <p className="text-sm text-slate-500">{selectedFile ? `Selected: ${fileName}` : "Click to select file"}</p>
+                            <input 
+                              ref={fileInputRef}
+                              type="file" 
+                              className="hidden" 
+                              onChange={handleFileChange}
+                            />
+                          </div>
+                        </div>
+                      )}
+
                       <div className="md:col-span-2">
-                        <Button type="submit" disabled={!fileContent} className="w-full h-12 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold">
-                          <Plus className="h-5 w-5 mr-2" /> Add Material
+                        <Button 
+                          type="submit" 
+                          disabled={isUploading || (materialForm.category === "Mock Tests" ? !Object.values(mockTestFiles).some(f => f !== null) : !selectedFile)} 
+                          className="w-full h-12 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold disabled:opacity-50"
+                        >
+                          {isUploading ? (
+                            <>
+                              <Loader2 className="h-5 w-5 mr-2 animate-spin" />
+                              Uploading...
+                            </>
+                          ) : (
+                            <>
+                              <Plus className="h-5 w-5 mr-2" /> 
+                              {materialForm.category === "Mock Tests" ? "Upload Mock Test Suite" : "Add Material"}
+                            </>
+                          )}
                         </Button>
                       </div>
                     </form>
@@ -406,9 +614,12 @@ export default function AdminPanel() {
                     <thead>
                       <tr className="bg-slate-50 dark:bg-slate-800/50 border-b border-slate-200 dark:border-slate-800">
                         <th className="p-4 font-bold text-sm text-slate-600 dark:text-slate-400">User</th>
+                        <th className="p-4 font-bold text-sm text-slate-600 dark:text-slate-400">Username</th>
                         <th className="p-4 font-bold text-sm text-slate-600 dark:text-slate-400">Telegram</th>
                         <th className="p-4 font-bold text-sm text-slate-600 dark:text-slate-400">Material</th>
                         <th className="p-4 font-bold text-sm text-slate-600 dark:text-slate-400">Score</th>
+                        <th className="p-4 font-bold text-sm text-slate-600 dark:text-slate-400">Band</th>
+                        <th className="p-4 font-bold text-sm text-slate-600 dark:text-slate-400">Writing</th>
                         <th className="p-4 font-bold text-sm text-slate-600 dark:text-slate-400">Date</th>
                       </tr>
                     </thead>
@@ -417,9 +628,31 @@ export default function AdminPanel() {
                         results.map((result) => (
                           <tr key={result.id} className="border-b border-slate-100 dark:border-slate-800/50 hover:bg-slate-50 dark:hover:bg-slate-800/20 transition-colors">
                             <td className="p-4 font-medium">{result.firstName} {result.lastName}</td>
+                            <td className="p-4 text-xs text-slate-500">{result.userName}</td>
                             <td className="p-4 text-blue-600 dark:text-blue-400">{result.telegramUsername}</td>
                             <td className="p-4 text-slate-600 dark:text-slate-400">{result.materialName}</td>
                             <td className="p-4 font-bold text-blue-600">{result.score}</td>
+                            <td className="p-4 font-black text-green-600">{result.bandScore || "N/A"}</td>
+                            <td className="p-4">
+                              {((result as any).writingTask1 || (result as any).writingTask2) ? (
+                                <Button 
+                                  variant="ghost" 
+                                  size="sm" 
+                                  className="text-blue-600 h-8 px-2 text-[10px] font-bold uppercase tracking-widest"
+                                  onClick={() => {
+                                    const text = `STUDENT: ${result.firstName} ${result.lastName}\nUSERNAME: ${result.userName}\nTELEGRAM: ${result.telegramUsername}\nTEST: ${result.materialName}\nDATE: ${new Date(result.timestamp).toLocaleString()}\n\nWriting Task 1:\n${result.writingTask1 || 'N/A'}\n\nWriting Task 2:\n${result.writingTask2 || 'N/A'}\n\nAI EVALUATION:\n${result.aiFeedback || 'N/A'}`;
+                                    const blob = new Blob([text], { type: 'text/plain' });
+                                    const url = URL.createObjectURL(blob);
+                                    const link = document.createElement('a');
+                                    link.href = url;
+                                    link.download = `${result.firstName}_${result.lastName}_Evaluation.txt`;
+                                    link.click();
+                                  }}
+                                >
+                                  Download Evaluation
+                                </Button>
+                              ) : "N/A"}
+                            </td>
                             <td className="p-4 text-xs text-slate-500">{new Date(result.timestamp).toLocaleString()}</td>
                           </tr>
                         ))
@@ -430,6 +663,48 @@ export default function AdminPanel() {
                       )}
                     </tbody>
                   </table>
+                </div>
+              </motion.div>
+            )}
+            {activeTab === "transcriptions" && (
+              <motion.div 
+                key="transcriptions"
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -10 }}
+                className="space-y-6"
+              >
+                <h2 className="text-2xl font-bold">User Audio Transcriptions</h2>
+                <div className="grid gap-4">
+                  {transcriptions.length > 0 ? (
+                    transcriptions.map((t) => (
+                      <div key={t.id} className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-6 shadow-sm">
+                        <div className="flex items-center justify-between mb-4">
+                          <div className="flex items-center gap-3">
+                            <div className="w-10 h-10 bg-blue-50 dark:bg-blue-900/20 rounded-xl flex items-center justify-center">
+                              <User className="h-5 w-5 text-blue-600" />
+                            </div>
+                            <div>
+                              <p className="font-bold text-slate-900 dark:text-white">{t.userName}</p>
+                              <p className="text-xs text-slate-500">{new Date(t.timestamp).toLocaleString()}</p>
+                            </div>
+                          </div>
+                          <div className="px-3 py-1 bg-slate-100 dark:bg-slate-800 rounded-full text-[10px] font-bold uppercase tracking-wider text-slate-500">
+                            Speaking Practice
+                          </div>
+                        </div>
+                        <div className="p-4 bg-slate-50 dark:bg-slate-800/50 rounded-2xl border border-slate-100 dark:border-slate-800 italic text-slate-700 dark:text-slate-300">
+                          "{t.text}"
+                        </div>
+                      </div>
+                    ))
+                  ) : (
+                    <div className="text-center py-20 bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 border-dashed">
+                      <FileText className="h-12 w-12 text-slate-300 mx-auto mb-4" />
+                      <h3 className="text-xl font-bold text-slate-900 dark:text-white">No transcriptions yet</h3>
+                      <p className="text-slate-500">User transcriptions will appear here.</p>
+                    </div>
+                  )}
                 </div>
               </motion.div>
             )}

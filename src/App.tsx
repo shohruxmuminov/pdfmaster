@@ -2,11 +2,14 @@ import { BrowserRouter, Routes, Route, useLocation, Navigate } from "react-route
 import Layout from "./components/Layout";
 import Home from "./pages/Home";
 import AdminPanel from "./pages/AdminPanel";
+import TeacherPanel from "./pages/TeacherPanel";
 import IELTSSection from "./pages/IELTSSection";
 import Auth from "./pages/Auth";
 import { GeminiProvider, useGemini } from "./components/GeminiContext";
 import { ThemeProvider } from "./components/ThemeProvider";
 import { useEffect } from "react";
+
+import ProfileSettings from "./pages/ProfileSettings";
 
 function ScrollToTop() {
   const { pathname } = useLocation();
@@ -32,6 +35,8 @@ function AppRoutes() {
       <Route path="/" element={<Layout />}>
         <Route index element={<Home />} />
         <Route path="admin" element={<ProtectedRoute><AdminPanel /></ProtectedRoute>} />
+        <Route path="teacher" element={<ProtectedRoute><TeacherPanel /></ProtectedRoute>} />
+        <Route path="settings" element={<ProtectedRoute><ProfileSettings /></ProtectedRoute>} />
         <Route path=":category" element={<ProtectedRoute><IELTSSection /></ProtectedRoute>} />
       </Route>
     </Routes>

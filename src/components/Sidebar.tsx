@@ -16,7 +16,7 @@ import { useState } from "react";
 import { AITutorModal } from "./AITutorModal";
 
 const sidebarItems = [
-  { id: "ai", icon: Sparkles, path: "#", label: "AI Tutor", color: "bg-[#8b5cf6]", isAction: true },
+  { id: "ai", icon: Sparkles, path: "#", label: "Gemini AI", color: "bg-[#8b5cf6]", isAction: true },
   { id: "dashboard", icon: LayoutGrid, path: "/", label: "Dashboard", color: "bg-[#ff6b00]" },
   { id: "reading", icon: BookOpen, path: "/reading", label: "Reading", color: "bg-[#2563eb]" },
   { id: "listening", icon: Headphones, path: "/listening", label: "Listening", color: "bg-[#107c54]" },

@@ -6,6 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/src/components/ui/ca
 import { motion, AnimatePresence } from "framer-motion";
 import { AITutorModal } from "@/src/components/AITutorModal";
 import { SpeakingControls } from "@/src/components/SpeakingControls";
+import { SpeakingPracticeHub } from "@/src/components/SpeakingPracticeHub";
 import { 
   FileText, 
   Play, 
@@ -26,22 +27,68 @@ import {
   Home as HomeIcon,
   Bot,
   Calendar,
-  Download
+  Download,
+  Trophy,
+  Ban,
+  Lock,
+  AlertTriangle
 } from "lucide-react";
 
 export default function IELTSSection() {
   const { category } = useParams<{ category: string }>();
-  const { isPremiumPlus, materials, submitResult } = useGemini();
+  const { isPremiumPlus, materials, submitResult, isMockTestEnabled, isBlocked, sendCheatAlert, user, role } = useGemini();
   const [selectedMaterial, setSelectedMaterial] = useState<any>(null);
-  const [resultForm, setResultForm] = useState({ firstName: "", lastName: "", telegramUsername: "", score: "" });
+  const [activeMockTest, setActiveMockTest] = useState<any[] | null>(null);
+  const [mockTestIndex, setMockTestIndex] = useState(0);
+  const [resultForm, setResultForm] = useState({ 
+    firstName: "", 
+    lastName: "", 
+    telegramUsername: "", 
+    score: "",
+    writingTask1: "",
+    writingTask2: ""
+  });
   const [isSubmitted, setIsSubmitted] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [activeFilter, setActiveFilter] = useState("All Tests");
   const [isAITutorOpen, setIsAITutorOpen] = useState(false);
+  const [showCheatWarning, setShowCheatWarning] = useState(false);
   const [timeLeft, setTimeLeft] = useState(3600);
   const [isTimerActive, setIsTimerActive] = useState(false);
   const viewerRef = useRef<HTMLDivElement>(null);
+
+  // Blocked user check
+  if (isBlocked && role !== "admin" && role !== "teacher") {
+    return (
+      <div className="min-h-screen bg-slate-50 dark:bg-slate-950 flex items-center justify-center p-4">
+        <Card className="max-w-md w-full p-12 text-center rounded-[3rem] border-none shadow-2xl">
+          <Ban className="h-20 w-20 text-red-600 mx-auto mb-6" />
+          <h1 className="text-3xl font-black mb-4">Access Blocked</h1>
+          <p className="text-slate-500 mb-8">Your access to mock tests has been restricted by a teacher or administrator.</p>
+          <Button asChild className="w-full h-14 rounded-2xl bg-slate-900 text-white font-bold">
+            <Link to="/">Return to Dashboard</Link>
+          </Button>
+        </Card>
+      </div>
+    );
+  }
+
+  // Mock test access check
+  if (category?.toLowerCase() === "mock-tests" && !isMockTestEnabled && role !== "admin" && role !== "teacher") {
+    return (
+      <div className="min-h-screen bg-slate-50 dark:bg-slate-950 flex items-center justify-center p-4">
+        <Card className="max-w-md w-full p-12 text-center rounded-[3rem] border-none shadow-2xl">
+          <Lock className="h-20 w-20 text-blue-600 mx-auto mb-6" />
+          <h1 className="text-3xl font-black mb-4">Tests Locked</h1>
+          <p className="text-slate-500 mb-8">Mock tests are currently locked. Please wait for a teacher to grant access.</p>
+          <Button asChild className="w-full h-14 rounded-2xl bg-blue-600 text-white font-bold">
+            <Link to="/">Return to Dashboard</Link>
+          </Button>
+        </Card>
+      </div>
+    );
+  }
 
   React.useEffect(() => {
     let interval: any = null;
@@ -67,7 +114,14 @@ export default function IELTSSection() {
 
   React.useEffect(() => {
     const handleFullscreenChange = () => {
-      setIsFullscreen(!!document.fullscreenElement);
+      const isNowFullscreen = !!document.fullscreenElement;
+      setIsFullscreen(isNowFullscreen);
+      
+      // Anti-cheat: Send alert if user exits fullscreen during a mock test
+      if (!isNowFullscreen && selectedMaterial && category?.toLowerCase() === "mock-tests" && !isSubmitted) {
+        sendCheatAlert((user as any)?.displayName || user?.email || "Anonymous");
+        setShowCheatWarning(true);
+      }
     };
 
     document.addEventListener("fullscreenchange", handleFullscreenChange);
@@ -77,10 +131,6 @@ export default function IELTSSection() {
   React.useEffect(() => {
     window.scrollTo(0, 0);
   }, [category, selectedMaterial]);
-
-  if (!isPremiumPlus) {
-    return <Navigate to="/" />;
-  }
 
   const sectionConfig = useMemo(() => {
     const cat = category?.toLowerCase();
@@ -163,6 +213,19 @@ export default function IELTSSection() {
           sidebarIcon: Sparkles,
           type: "standard"
         };
+      case "mock-tests":
+        return {
+          title: "Full Mock Tests",
+          subtitle: "Complete IELTS exam simulations to test your readiness for the real exam",
+          icon: <Trophy className="h-8 w-8" />,
+          color: "bg-[#0f172a]",
+          textColor: "text-[#0f172a]",
+          borderColor: "border-[#0f172a]",
+          buttonColor: "bg-[#0f172a] hover:bg-slate-800",
+          accentColor: "bg-slate-900/10",
+          sidebarIcon: Trophy,
+          type: "standard"
+        };
       default:
         return {
           title: "IELTS Practice",
@@ -179,27 +242,59 @@ export default function IELTSSection() {
     }
   }, [category]);
 
-  const sectionMaterials = materials.filter(m => m.category.toLowerCase() === category?.toLowerCase());
+  const sectionMaterials = materials.filter(m => {
+    const cat = category?.toLowerCase();
+    if (cat === "mock-tests") return m.category === "Mock Tests";
+    return m.category.toLowerCase() === cat;
+  });
+
+  const groupedMockTests = useMemo(() => {
+    if (category?.toLowerCase() !== "mock-tests") return null;
+    
+    const groups: Record<string, any[]> = {};
+    sectionMaterials.forEach(m => {
+      const id = m.mockTestId || "Uncategorized";
+      if (!groups[id]) groups[id] = [];
+      groups[id].push(m);
+    });
+    
+    const order = ["Listening", "Reading", "Writing"];
+    return Object.entries(groups).map(([id, components]) => {
+      const sorted = [...components].sort((a, b) => {
+        const indexA = order.indexOf(a.subCategory || "");
+        const indexB = order.indexOf(b.subCategory || "");
+        return indexA - indexB;
+      });
+      return {
+        id,
+        name: id === "Uncategorized" ? "Individual Mock Components" : id,
+        components: sorted,
+        category: "Mock Tests",
+        timestamp: Math.max(...sorted.map(s => s.timestamp || 0))
+      };
+    });
+  }, [category, sectionMaterials]);
   
   const filteredMaterials = useMemo(() => {
-    return sectionMaterials
+    const baseList = category?.toLowerCase() === "mock-tests" ? (groupedMockTests || []) : sectionMaterials;
+    return baseList
       .filter(m => m.name.toLowerCase().includes(searchQuery.toLowerCase()))
       .filter(m => {
         if (activeFilter === "All Tests") return true;
-        if (category?.toLowerCase() === "books" && m.subCategory) {
-          return m.subCategory === activeFilter;
+        if (category?.toLowerCase() === "books" && (m as any).subCategory) {
+          return (m as any).subCategory === activeFilter;
         }
         return m.name.includes(activeFilter);
       });
-  }, [sectionMaterials, searchQuery, activeFilter, category]);
+  }, [sectionMaterials, groupedMockTests, searchQuery, activeFilter, category]);
 
   const sidebarFilters = useMemo(() => {
     const counts: Record<string, number> = { "All Tests": sectionMaterials.length };
     
     if (category?.toLowerCase() === "books") {
       sectionMaterials.forEach(m => {
-        if (m.subCategory) {
-          counts[m.subCategory] = (counts[m.subCategory] || 0) + 1;
+        if ((m as any).subCategory) {
+          counts[(m as any).subCategory] = (counts[(m as any).subCategory] || 0) + 1;
         }
       });
     } else {
@@ -215,6 +310,14 @@ export default function IELTSSection() {
     return Object.entries(counts).map(([name, count]) => ({ name, count }));
   }, [sectionMaterials, category]);
 
+  if (!isPremiumPlus) {
+    return <Navigate to="/" />;
+  }
+
+  if (category?.toLowerCase() === "speaking") {
+    return <SpeakingPracticeHub />;
+  }
+
   const toggleFullscreen = () => {
     if (!viewerRef.current) return;
 
@@ -229,23 +332,25 @@ export default function IELTSSection() {
     }
   };
 
-  const handleDownload = (material: any) => {
+  const handleDownload = async (material: any) => {
     const isHtml = material.type.includes("html") || material.type.includes("text");
     let url = material.content;
+    const isUrl = url.startsWith('http');
     
-    if (isHtml) {
+    if (isHtml && !isUrl) {
       const blob = new Blob([material.content], { type: 'text/html' });
       url = URL.createObjectURL(blob);
     }
 
     const link = document.createElement('a');
     link.href = url;
+    link.target = "_blank";
     link.download = material.name.includes('.') ? material.name : `${material.name}${isHtml ? '.html' : ''}`;
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
     
-    if (isHtml) {
+    if (isHtml && !isUrl) {
       URL.revokeObjectURL(url);
     }
   };
@@ -253,22 +358,31 @@ export default function IELTSSection() {
   const handleMaterialClick = (material: any) => {
     setSelectedMaterial(material);
     setIsSubmitted(false);
-    setResultForm({ firstName: "", lastName: "", telegramUsername: "", score: "" });
+    setResultForm({ 
+      firstName: user?.displayName?.split(' ')[0] || "", 
+      lastName: user?.displayName?.split(' ')[1] || "", 
+      telegramUsername: "", 
+      score: "",
+      writingTask1: "",
+      writingTask2: ""
+    });
     setTimeLeft(3600);
     setIsTimerActive(true);
     
-    // Use a slightly longer timeout to ensure the DOM is fully ready
+    // Force fullscreen for all materials
     setTimeout(() => {
       if (viewerRef.current && !document.fullscreenElement) {
         viewerRef.current.requestFullscreen().catch((err) => {
           console.error("Fullscreen error:", err);
         });
       }
-    }, 300);
+    }, 500);
   };
 
   const handleBack = () => {
     setSelectedMaterial(null);
+    setActiveMockTest(null);
+    setMockTestIndex(0);
     setIsTimerActive(false);
     if (document.fullscreenElement) {
       document.exitFullscreen().catch(() => {});
@@ -291,6 +405,21 @@ export default function IELTSSection() {
     }
   };
 
+  if (category?.toLowerCase() === "mock-tests" && !isMockTestEnabled && role !== "admin" && role !== "teacher") {
+    return (
+      <div className="min-h-screen bg-slate-50 dark:bg-slate-950 flex items-center justify-center p-4">
+        <Card className="max-w-md w-full p-12 text-center rounded-[3rem] border-none shadow-2xl">
+          <Lock className="h-20 w-20 text-blue-600 mx-auto mb-6" />
+          <h1 className="text-3xl font-black mb-4">Tests Locked</h1>
+          <p className="text-slate-500 mb-8">Mock tests are currently locked. Please wait for a teacher to grant access.</p>
+          <Button asChild className="w-full h-14 rounded-2xl bg-blue-600 text-white font-bold">
+            <Link to="/">Return to Dashboard</Link>
+          </Button>
+        </Card>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-[#f0f4f8] dark:bg-slate-950">
       <AITutorModal 
@@ -300,6 +429,34 @@ export default function IELTSSection() {
       />
 
       <AnimatePresence mode="wait">
+        {showCheatWarning && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm">
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.9 }}
+              animate={{ opacity: 1, scale: 1 }}
+              className="bg-white dark:bg-slate-900 p-8 rounded-[2.5rem] max-w-md w-full text-center shadow-2xl border-2 border-red-500"
+            >
+              <AlertTriangle className="h-16 w-16 text-red-600 mx-auto mb-6 animate-bounce" />
+              <h2 className="text-2xl font-black mb-4 text-red-600 uppercase tracking-tighter">Security Warning</h2>
+              <p className="text-slate-600 dark:text-slate-400 mb-8 font-medium">
+                You have exited fullscreen mode. This action has been logged and reported to your teacher. 
+                Please return to fullscreen immediately to continue your test.
+              </p>
+              <Button 
+                onClick={() => {
+                  setShowCheatWarning(false);
+                  if (viewerRef.current) {
+                    viewerRef.current.requestFullscreen().catch(() => {});
+                  }
+                }}
+                className="w-full h-14 rounded-2xl bg-red-600 hover:bg-red-700 text-white font-bold shadow-lg shadow-red-600/20"
+              >
+                Return to Fullscreen
+              </Button>
+            </motion.div>
+          </div>
+        )}
+
         {!selectedMaterial ? (
           <motion.div 
             key="list"
@@ -343,7 +500,7 @@ export default function IELTSSection() {
                     onClick={() => setIsAITutorOpen(true)}
                     className="bg-[#8b5cf6] hover:bg-[#7c3aed] text-white rounded-lg h-10"
                   >
-                    <Bot className="h-4 w-4 mr-2" /> AI Essay Checker
+                    <Bot className="h-4 w-4 mr-2" /> Gemini AI Essay Checker
                   </Button>
                 </div>
               </div>
@@ -384,13 +541,13 @@ export default function IELTSSection() {
                     <div className="bg-gradient-to-br from-blue-600 to-violet-600 rounded-2xl p-6 text-white shadow-xl">
                       <Sparkles className="h-8 w-8 mb-4 opacity-80" />
                       <h4 className="font-bold text-lg mb-2">Need Help?</h4>
-                      <p className="text-sm text-white/80 mb-4">Our AI tutor can help you analyze your mistakes and improve your score.</p>
+                      <p className="text-sm text-white/80 mb-4">Our Gemini AI can help you analyze your mistakes and improve your score.</p>
                       <Button 
                         onClick={() => setIsAITutorOpen(true)}
                         variant="secondary" 
                         className="w-full rounded-xl bg-white text-blue-600 hover:bg-white/90 border-none font-bold"
                       >
-                        Ask AI Tutor
+                        Ask Gemini AI
                       </Button>
                     </div>
                   </aside>
@@ -496,11 +653,11 @@ export default function IELTSSection() {
                               <div className="flex items-center gap-4 text-xs text-slate-500 mb-6">
                                 <div className="flex items-center gap-1">
                                   <Clock className="h-3 w-3" />
-                                  {category?.toLowerCase() === "books" || category?.toLowerCase() === "vocabulary" ? "Study Material" : "60 mins"}
+                                  {category?.toLowerCase() === "mock-tests" ? `${(material as any).components.length} Sections` : (category?.toLowerCase() === "books" || category?.toLowerCase() === "vocabulary" ? "Study Material" : "60 mins")}
                                 </div>
                                 <div className="flex items-center gap-1">
                                   <FileText className="h-3 w-3" />
-                                  {material.subCategory || category}
+                                  {category?.toLowerCase() === "mock-tests" ? "Full Simulation" : ((material as any).subCategory || category)}
                                 </div>
                               </div>
 
@@ -508,6 +665,10 @@ export default function IELTSSection() {
                                 onClick={() => {
                                   if (category?.toLowerCase() === "books") {
                                     handleDownload(material);
+                                  } else if (category?.toLowerCase() === "mock-tests") {
+                                    setActiveMockTest((material as any).components);
+                                    setMockTestIndex(0);
+                                    handleMaterialClick((material as any).components[0]);
                                   } else {
                                     handleMaterialClick(material);
                                   }
@@ -517,7 +678,7 @@ export default function IELTSSection() {
                                 {category?.toLowerCase() === "books" ? (
                                   <><Download className="h-4 w-4" /> Download Book</>
                                 ) : (
-                                  <><Play className="h-4 w-4 fill-current" /> Start Test</>
+                                  <><Play className="h-4 w-4 fill-current" /> {category?.toLowerCase() === "mock-tests" ? "Start Full Test" : "Start Test"}</>
                                 )}
                               </Button>
                             </div>
@@ -554,91 +715,75 @@ export default function IELTSSection() {
               ref={viewerRef}
               className={`relative bg-white dark:bg-slate-900 overflow-hidden shadow-2xl group/viewer flex flex-col ${isFullscreen ? "w-screen h-screen rounded-none" : "rounded-3xl border border-slate-200 dark:border-slate-800"}`}
             >
-              {/* Header - Hide in fullscreen to give maximum space to the test */}
-              {!isFullscreen && (
-                <div className={`p-4 ${sectionConfig.color} text-white flex items-center justify-between shrink-0`}>
-                  <div className="flex items-center gap-3">
+              {/* Header - Show a simplified version in fullscreen or normal mode if test is active */}
+              <div className={`p-4 ${sectionConfig.color} text-white flex items-center justify-between shrink-0 z-[60] relative shadow-lg`}>
+                <div className="flex items-center gap-3">
+                  <div className="bg-white/20 p-2 rounded-xl backdrop-blur-md">
                     {sectionConfig.icon}
-                    <div>
-                      <h2 className="font-bold">{selectedMaterial.name}</h2>
-                      <p className="text-xs opacity-80">IELTS {category} Practice</p>
-                    </div>
                   </div>
-                  <div className="flex items-center gap-2">
-                    <div className={`flex items-center gap-2 px-4 py-1.5 rounded-full font-mono font-bold text-lg ${timeLeft < 300 ? 'bg-red-500/20 text-red-200 animate-pulse' : 'bg-white/20 text-white'}`}>
-                      <Clock className="h-4 w-4" />
-                      {category?.toLowerCase() === "books" || category?.toLowerCase() === "vocabulary" ? "Study Mode" : formatTime(timeLeft)}
+                  <div>
+                    <h2 className="font-black text-sm md:text-base tracking-tight">
+                      {activeMockTest ? `${activeMockTest[0].mockTestId}: ${selectedMaterial.subCategory}` : selectedMaterial.name}
+                    </h2>
+                    <div className="flex items-center gap-2">
+                      <span className="text-[10px] font-black uppercase tracking-widest opacity-70">
+                        {activeMockTest ? `Part ${mockTestIndex + 1} of ${activeMockTest.length}` : `IELTS ${category} Practice`}
+                      </span>
+                      {isTimerActive && (
+                        <span className="flex items-center gap-1 px-2 py-0.5 bg-green-500/30 rounded-full text-[8px] font-black uppercase tracking-widest animate-pulse">
+                          <div className="w-1 h-1 bg-green-400 rounded-full" /> Live Test
+                        </span>
+                      )}
                     </div>
-                    <Button 
-                      variant="secondary" 
-                      size="sm" 
-                      onClick={() => setIsAITutorOpen(true)}
-                      className="rounded-full bg-white/20 hover:bg-white/30 border-none text-white font-bold"
-                    >
-                      <Bot className="h-4 w-4 mr-2" /> Ask AI Tutor
-                    </Button>
-                    <Button 
-                      variant="secondary" 
-                      size="icon" 
-                      onClick={toggleFullscreen}
-                      className="rounded-full transition-opacity bg-white/20 hover:bg-white/30 border-none text-white opacity-0 group-hover/viewer:opacity-100"
-                    >
-                      <Maximize2 className="h-4 w-4" />
-                    </Button>
                   </div>
                 </div>
-              )}
-
-              {/* Fullscreen Controls (Floating) */}
-              {isFullscreen && (
-                <>
-                  <div className="absolute top-4 left-1/2 -translate-x-1/2 z-50">
-                    <div className={`flex items-center gap-3 px-6 py-2 rounded-full font-mono font-bold text-2xl backdrop-blur-md shadow-2xl border ${timeLeft < 300 ? 'bg-red-600/80 text-white border-red-400 animate-pulse' : 'bg-slate-900/80 text-white border-slate-700'}`}>
-                      <Clock className="h-6 w-6" />
-                      {category?.toLowerCase() === "books" || category?.toLowerCase() === "vocabulary" ? "Study Mode" : formatTime(timeLeft)}
+                
+                <div className="flex items-center gap-3">
+                  <div className={`flex items-center gap-2 px-4 py-2 rounded-xl font-mono font-black text-lg md:text-xl backdrop-blur-md border ${timeLeft < 300 ? 'bg-red-500/30 text-white border-red-400 animate-pulse' : 'bg-white/10 text-white border-white/10'}`}>
+                    <Clock className="h-5 w-5" />
+                    {category?.toLowerCase() === "books" || category?.toLowerCase() === "vocabulary" || category?.toLowerCase() === "mock-tests" ? "Study Mode" : formatTime(timeLeft)}
+                  </div>
+                  
+                  {!isFullscreen && (
+                    <div className="hidden md:flex items-center gap-2">
+                      <Button 
+                        variant="secondary" 
+                        size="sm" 
+                        onClick={() => setIsAITutorOpen(true)}
+                        className="rounded-xl bg-white/10 hover:bg-white/20 border-none text-white font-black text-xs h-10 px-4"
+                      >
+                        <Bot className="h-4 w-4 mr-2" /> Gemini AI
+                      </Button>
+                      <Button 
+                        variant="secondary" 
+                        size="icon" 
+                        onClick={toggleFullscreen}
+                        className="rounded-xl bg-white/10 hover:bg-white/20 border-none text-white h-10 w-10"
+                      >
+                        <Maximize2 className="h-4 w-4" />
+                      </Button>
                     </div>
-                  </div>
-                  <div className="absolute top-4 right-4 z-50 flex gap-2 opacity-0 hover:opacity-100 transition-opacity">
-                    <Button 
-                      variant="secondary" 
-                      size="sm" 
-                      onClick={() => setIsAITutorOpen(true)}
-                      className="rounded-full bg-slate-900/50 hover:bg-slate-900/80 backdrop-blur-md border-none text-white font-bold"
-                    >
-                      <Bot className="h-4 w-4 mr-2" /> AI Tutor
-                    </Button>
-                    <Button 
-                      variant="secondary" 
-                      size="icon" 
-                      onClick={toggleFullscreen}
-                      className="rounded-full bg-slate-900/50 hover:bg-slate-900/80 backdrop-blur-md border-none text-white"
-                    >
-                      <Minimize2 className="h-4 w-4" />
-                    </Button>
-                  </div>
-                </>
-              )}
+                  )}
+                </div>
+              </div>
 
-              {/* Progress Bar */}
-              <div className="w-full h-1.5 bg-slate-100 dark:bg-slate-800 shrink-0 relative z-50">
+              {/* Progress Bar - Always Persistent */}
+              <div className="w-full h-2 bg-slate-100 dark:bg-slate-800 shrink-0 relative z-[60] overflow-hidden">
                 <motion.div 
-                  className={`h-full ${sectionConfig.color} shadow-[0_0_10px_rgba(0,0,0,0.1)]`}
+                  className={`h-full ${sectionConfig.color} shadow-[0_0_15px_rgba(0,0,0,0.2)] relative`}
                   initial={{ width: 0 }}
                   animate={{ width: `${progress}%` }}
                   transition={{ duration: 0.5, ease: "linear" }}
-                />
-                {/* Progress markers for IELTS sections */}
-                <div className="absolute inset-0 flex justify-between pointer-events-none">
-                  {[25, 50, 75].map(marker => (
-                    <div key={marker} className="h-full w-px bg-white/20 dark:bg-slate-700/50" style={{ left: `${marker}%` }} />
-                  ))}
-                </div>
+                >
+                  <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent animate-shimmer" style={{ backgroundSize: '200% 100%' }} />
+                </motion.div>
               </div>
 
               <div className="relative flex-1 min-h-0">
                 {selectedMaterial.type.includes("html") ? (
                   <iframe 
-                    srcDoc={selectedMaterial.content} 
+                    src={selectedMaterial.content.startsWith('http') ? selectedMaterial.content : undefined}
+                    srcDoc={selectedMaterial.content.startsWith('http') ? undefined : selectedMaterial.content} 
                     className="w-full h-full border-none bg-white"
                     title={selectedMaterial.name}
                     tabIndex={-1}
@@ -670,7 +815,31 @@ export default function IELTSSection() {
                         </div>
                         <h3 className="text-xl font-bold text-slate-900 dark:text-white mb-2">Result Submitted!</h3>
                         <p className="text-slate-500 mb-6">Your score has been recorded successfully.</p>
-                        <Button onClick={handleBack} variant="outline" className="rounded-xl">Back to Materials</Button>
+                        <div className="flex items-center justify-center gap-4">
+                          <Button onClick={handleBack} variant="outline" className="rounded-xl">Back to Materials</Button>
+                          {activeMockTest && mockTestIndex < activeMockTest.length - 1 && (
+                            <Button 
+                              onClick={() => {
+                                const nextIndex = mockTestIndex + 1;
+                                setMockTestIndex(nextIndex);
+                                setSelectedMaterial(activeMockTest[nextIndex]);
+                                setIsSubmitted(false);
+                                setResultForm({ 
+                                  firstName: "", 
+                                  lastName: "", 
+                                  telegramUsername: "", 
+                                  score: "",
+                                  writingTask1: "",
+                                  writingTask2: ""
+                                });
+                                setTimeLeft(3600);
+                              }} 
+                              className="rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold"
+                            >
+                              Next Section: {activeMockTest[mockTestIndex + 1].subCategory}
+                            </Button>
+                          )}
+                        </div>
                       </div>
                     ) : (
                       <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -718,6 +887,30 @@ export default function IELTSSection() {
                             placeholder="e.g. 7.5"
                           />
                         </div>
+                        {sectionConfig.type === "writing" && (
+                          <>
+                            <div className="md:col-span-2 space-y-2">
+                              <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Writing Task 1 Essay</label>
+                              <textarea 
+                                required
+                                value={resultForm.writingTask1}
+                                onChange={(e) => setResultForm({...resultForm, writingTask1: e.target.value})}
+                                className="w-full px-4 py-3 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-800 focus:ring-2 focus:ring-blue-500 outline-none min-h-[200px]"
+                                placeholder="Paste your Task 1 essay here..."
+                              />
+                            </div>
+                            <div className="md:col-span-2 space-y-2">
+                              <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Writing Task 2 Essay</label>
+                              <textarea 
+                                required
+                                value={resultForm.writingTask2}
+                                onChange={(e) => setResultForm({...resultForm, writingTask2: e.target.value})}
+                                className="w-full px-4 py-3 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-800 focus:ring-2 focus:ring-blue-500 outline-none min-h-[300px]"
+                                placeholder="Paste your Task 2 essay here..."
+                              />
+                            </div>
+                          </>
+                        )}
                         <div className="md:col-span-2 pt-4">
                           <Button type="submit" className={`w-full h-12 rounded-xl ${sectionConfig.buttonColor} text-white text-lg font-bold shadow-lg`}>
                             <Send className="h-5 w-5 mr-2" /> Submit Result

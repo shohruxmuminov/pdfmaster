@@ -4,7 +4,7 @@
   "apiKey": "AIzaSyA2ueFz2ijbBz8uoNxWW4RlGhqcTJqjhWM",
   "authDomain": "flutter-ai-playground-e59c0.firebaseapp.com",
   "firestoreDatabaseId": "ai-studio-d6e90274-958f-4a83-8125-910afd4dd078",
-  "storageBucket": "flutter-ai-playground-e59c0.firebasestorage.app",
+  "storageBucket": "flutter-ai-playground-e59c0.appspot.com",
   "messagingSenderId": "739402615898",
   "measurementId": ""
 }

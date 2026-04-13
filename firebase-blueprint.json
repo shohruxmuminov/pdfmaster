@@ -9,7 +9,8 @@
         "email": { "type": "string", "format": "email", "description": "The user's email address." },
         "premiumStatus": { "type": "string", "enum": ["none", "pending", "approved"], "description": "The user's premium status." },
         "expiryDate": { "type": "number", "description": "The timestamp when the premium status expires." },
-        "role": { "type": "string", "enum": ["user", "admin"], "description": "The user's role." }
+        "role": { "type": "string", "enum": ["user", "admin", "teacher"], "description": "The user's role." },
+        "isBlocked": { "type": "boolean", "description": "Whether the user is blocked from taking tests." }
       },
       "required": ["uid", "email", "premiumStatus", "role"]
     },
@@ -31,7 +32,7 @@
       "type": "object",
       "properties": {
         "id": { "type": "string" },
-        "category": { "type": "string", "enum": ["Listening", "Reading", "Writing", "Speaking", "Books", "Vocabulary"] },
+        "category": { "type": "string", "enum": ["Listening", "Reading", "Writing", "Speaking", "Books", "Vocabulary", "Mock Tests"] },
         "name": { "type": "string" },
         "type": { "type": "string" },
         "content": { "type": "string" },
@@ -54,6 +55,41 @@
         "timestamp": { "type": "number" }
       },
       "required": ["id", "firstName", "lastName", "telegramUsername", "materialId", "materialName", "score", "timestamp"]
+    },
+    "Transcription": {
+      "title": "Audio Transcription",
+      "description": "Transcribed text from user audio recordings.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "userId": { "type": "string" },
+        "userName": { "type": "string" },
+        "text": { "type": "string" },
+        "timestamp": { "type": "number" },
+        "audioUrl": { "type": "string" }
+      },
+      "required": ["id", "userId", "userName", "text", "timestamp"]
+    },
+    "GlobalSettings": {
+      "title": "Global Settings",
+      "description": "Global application settings.",
+      "type": "object",
+      "properties": {
+        "mockTestAccessEnabled": { "type": "boolean" }
+      },
+      "required": ["mockTestAccessEnabled"]
+    },
+    "CheatAlert": {
+      "title": "Cheat Alert",
+      "description": "Notifications for suspicious activity.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "userName": { "type": "string" },
+        "timestamp": { "type": "number" },
+        "type": { "type": "string", "enum": ["fullscreen_exit"] }
+      },
+      "required": ["userId", "userName", "timestamp", "type"]
     }
   },
   "firestore": {
@@ -72,6 +108,18 @@
     "/results/{resultId}": {
       "schema": "UserResult",
       "description": "User test results."
+    },
+    "/transcriptions/{transcriptionId}": {
+      "schema": "Transcription",
+      "description": "User audio transcriptions."
+    },
+    "/settings/global": {
+      "schema": "GlobalSettings",
+      "description": "Global settings."
+    },
+    "/alerts/{alertId}": {
+      "schema": "CheatAlert",
+      "description": "Cheat alerts."
     }
   }
 }
