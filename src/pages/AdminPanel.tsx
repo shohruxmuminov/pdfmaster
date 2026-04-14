@@ -438,62 +438,85 @@ export default function AdminPanel() {
                   <CardContent className="p-8">
                     <div className="mb-8 p-6 bg-blue-50 dark:bg-blue-900/20 rounded-2xl border border-blue-100 dark:border-blue-900/30">
                       <h3 className="text-lg font-bold text-blue-800 dark:text-blue-300 mb-2">Import from Wisdom2</h3>
-                      <p className="text-sm text-blue-600 dark:text-blue-400 mb-4">Quickly import all reading materials from your previous website (wisdom2.netlify.app).</p>
-                      <Button 
-                        onClick={async () => {
-                          try {
-                            setError("");
-                            setSuccess("Importing materials...");
-                            const { collection, addDoc } = await import("firebase/firestore");
-                            const { db } = await import("../firebase");
-                            
-                            const freeMaterials = [
-                              {title:"IELTS with Jurabek - Reading Test 1",url:"/reading/IELTSwithJurabek Reading.html"},
-                              {title:"IELTS with Jurabek - Reading Test 2",url:"/reading/IELTSwithJurabek.html"},
-                              {title:"CDI Full Reading",url:"/reading/CDI Full reading.html"},
-                              {title:"CDI Reading",url:"/reading/CDI Reading.html"}
-                            ];
+                      <p className="text-sm text-blue-600 dark:text-blue-400 mb-4">Quickly import materials from your previous website (wisdom2.netlify.app).</p>
+                      
+                      <div className="flex flex-wrap gap-3 mb-4">
+                        {(["Reading", "Listening", "Writing", "Speaking"] as const).map((cat) => (
+                          <Button
+                            key={cat}
+                            variant="outline"
+                            size="sm"
+                            onClick={async () => {
+                              try {
+                                setError("");
+                                setSuccess(`Importing ${cat} materials...`);
+                                const { collection, addDoc } = await import("firebase/firestore");
+                                const { db } = await import("../firebase");
+                                
+                                let materialsToImport: {title: string, url: string, isPremium: boolean}[] = [];
 
-                            const premiumMaterials = [
-                              {title:"Premium Full Reading 1",url:"/reading/premiumreading/IELTSwithJurabek FULL Reading 1.html"},
-                              {title:"Premium Full Reading 2",url:"/reading/premiumreading/IELTSwithJurabek Reading full 2.html"},
-                              {title:"Premium Full Reading 3",url:"/reading/premiumreading/IELTSwithJurabek Full reading 3.html"},
-                              {title:"Premium Full Reading 4",url:"/reading/premiumreading/IELTSwithJurabek Full reading 4.html"},
-                              {title:"Premium Full Reading 5",url:"/reading/premiumreading/IELTSwithJurabek full reading 5.html"},
-                              {title:"Premium Full Reading 6",url:"/reading/premiumreading/IELTSwithJurabek FULL Reading 6.html"},
-                              {title:"Premium Full Reading 7",url:"/reading/premiumreading/IELTSwithJurabek Reading full 7.html"},
-                              {title:"Premium Full Reading 8",url:"/reading/premiumreading/Full reading 8.html"},
-                              {title:"Premium Full Reading 9 (3 Passages)",url:"/reading/premiumreading/Full Reading 12.html"},
-                              {title:"Premium Full Reading 10",url:"/reading/premiumreading/Full reading 10.html"},
-                              {title:"Premium Full Reading 11",url:"/reading/premiumreading/IELTSwithJurabek FULL Reading 11.html"},
-                              {title:"Premium Full Reading 12",url:"/reading/premiumreading/Full Reading 12.html"}
-                            ];
+                                if (cat === "Reading") {
+                                  materialsToImport = [
+                                    {title:"IELTS with Jurabek - Reading Test 1", url:"/reading/IELTSwithJurabek Reading.html", isPremium: false},
+                                    {title:"IELTS with Jurabek - Reading Test 2", url:"/reading/IELTSwithJurabek.html", isPremium: false},
+                                    {title:"CDI Full Reading", url:"/reading/CDI Full reading.html", isPremium: false},
+                                    {title:"CDI Reading", url:"/reading/CDI Reading.html", isPremium: false},
+                                    {title:"Premium Full Reading 1", url:"/reading/premiumreading/IELTSwithJurabek FULL Reading 1.html", isPremium: true},
+                                    {title:"Premium Full Reading 2", url:"/reading/premiumreading/IELTSwithJurabek Reading full 2.html", isPremium: true},
+                                    {title:"Premium Full Reading 3", url:"/reading/premiumreading/IELTSwithJurabek Full reading 3.html", isPremium: true},
+                                    {title:"Premium Full Reading 4", url:"/reading/premiumreading/IELTSwithJurabek Full reading 4.html", isPremium: true},
+                                    {title:"Premium Full Reading 5", url:"/reading/premiumreading/IELTSwithJurabek full reading 5.html", isPremium: true},
+                                    {title:"Premium Full Reading 6", url:"/reading/premiumreading/IELTSwithJurabek FULL Reading 6.html", isPremium: true},
+                                    {title:"Premium Full Reading 7", url:"/reading/premiumreading/IELTSwithJurabek Reading full 7.html", isPremium: true},
+                                    {title:"Premium Full Reading 8", url:"/reading/premiumreading/Full reading 8.html", isPremium: true},
+                                    {title:"Premium Full Reading 9 (3 Passages)", url:"/reading/premiumreading/Full Reading 12.html", isPremium: true},
+                                    {title:"Premium Full Reading 10", url:"/reading/premiumreading/Full reading 10.html", isPremium: true},
+                                    {title:"Premium Full Reading 11", url:"/reading/premiumreading/IELTSwithJurabek FULL Reading 11.html", isPremium: true},
+                                    {title:"Premium Full Reading 12", url:"/reading/premiumreading/Full Reading 12.html", isPremium: true}
+                                  ];
+                                } else if (cat === "Listening") {
+                                  materialsToImport = [
+                                    {title:"IELTS with Jurabek - Listening Test 1", url:"/listening/test1.html", isPremium: false},
+                                    {title:"IELTS with Jurabek - Listening Test 2", url:"/listening/test2.html", isPremium: false},
+                                    {title:"Premium Listening 1", url:"/listening/premium/test1.html", isPremium: true},
+                                    {title:"Premium Listening 2", url:"/listening/premium/test2.html", isPremium: true}
+                                  ];
+                                } else if (cat === "Writing") {
+                                  materialsToImport = [
+                                    {title:"IELTS with Jurabek - Writing Task 1", url:"/writing/task1.html", isPremium: false},
+                                    {title:"IELTS with Jurabek - Writing Task 2", url:"/writing/task2.html", isPremium: false},
+                                    {title:"Premium Writing 1", url:"/writing/premium/task1.html", isPremium: true}
+                                  ];
+                                } else if (cat === "Speaking") {
+                                  materialsToImport = [
+                                    {title:"IELTS with Jurabek - Speaking Part 1", url:"/speaking/part1.html", isPremium: false},
+                                    {title:"IELTS with Jurabek - Speaking Part 2", url:"/speaking/part2.html", isPremium: false},
+                                    {title:"Premium Speaking 1", url:"/speaking/premium/part1.html", isPremium: true}
+                                  ];
+                                }
 
-                            const allMaterials = [
-                              ...freeMaterials.map(m => ({...m, category: "Reading", isPremium: false})),
-                              ...premiumMaterials.map(m => ({...m, category: "Reading", isPremium: true}))
-                            ];
-
-                            for (const mat of allMaterials) {
-                              await addDoc(collection(db, "materials"), {
-                                name: mat.title,
-                                category: mat.category,
-                                subCategory: "Reading",
-                                type: "text/html",
-                                content: "https://wisdom2.netlify.app" + mat.url.replace(/ /g, "%20"),
-                                timestamp: Date.now(),
-                                isPremium: mat.isPremium
-                              });
-                            }
-                            setSuccess("Successfully imported " + allMaterials.length + " materials from Wisdom2!");
-                          } catch (err: any) {
-                            setError("Import failed: " + err.message);
-                          }
-                        }}
-                        className="bg-blue-600 hover:bg-blue-700 text-white rounded-xl"
-                      >
-                        <Download className="h-4 w-4 mr-2" /> Import Materials
-                      </Button>
+                                for (const mat of materialsToImport) {
+                                  await addDoc(collection(db, "materials"), {
+                                    name: mat.title,
+                                    category: cat,
+                                    subCategory: cat,
+                                    type: "text/html",
+                                    content: "https://wisdom2.netlify.app" + mat.url.replace(/ /g, "%20"),
+                                    timestamp: Date.now(),
+                                    isPremium: mat.isPremium
+                                  });
+                                }
+                                setSuccess(`Successfully imported ${materialsToImport.length} ${cat} materials!`);
+                              } catch (err: any) {
+                                setError("Import failed: " + err.message);
+                              }
+                            }}
+                            className="rounded-xl border-blue-200 text-blue-600 hover:bg-blue-50"
+                          >
+                            Import {cat}
+                          </Button>
+                        ))}
+                      </div>
                     </div>
 
                     {error && (

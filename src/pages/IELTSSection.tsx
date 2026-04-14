@@ -286,16 +286,19 @@ export default function IELTSSection() {
     return baseList
       .filter(m => m.name.toLowerCase().includes(searchQuery.toLowerCase()))
       .filter(m => {
-        if (activeFilter === "All Tests") return true;
+        if (activeFilter === "All Materials" || activeFilter === "All Tests") return true;
         if (category?.toLowerCase() === "books" && (m as any).subCategory) {
           return (m as any).subCategory === activeFilter;
         }
-        return m.name.includes(activeFilter);
+        if (activeFilter === "General Practice") {
+          return !m.name.includes(",");
+        }
+        return m.name.startsWith(activeFilter);
       });
   }, [freeMaterials, premiumMaterials, groupedMockTests, searchQuery, activeFilter, category, activeTab]);
 
   const sidebarFilters = useMemo(() => {
-    const counts: Record<string, number> = { "All Tests": sectionMaterials.length };
+    const counts: Record<string, number> = { "All Materials": sectionMaterials.length };
     
     if (category?.toLowerCase() === "books") {
       sectionMaterials.forEach(m => {
@@ -306,9 +309,11 @@ export default function IELTSSection() {
     } else {
       sectionMaterials.forEach(m => {
         const parts = m.name.split(",");
-        if (parts.length > 0) {
+        if (parts.length > 1) {
           const prefix = parts[0].trim();
           counts[prefix] = (counts[prefix] || 0) + 1;
+        } else {
+          counts["General Practice"] = (counts["General Practice"] || 0) + 1;
         }
       });
     }

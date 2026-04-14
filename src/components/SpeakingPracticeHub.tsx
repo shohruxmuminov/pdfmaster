@@ -324,6 +324,7 @@ const speakingData: SpeakingCard[] = [
 
 const SpeakingHubCard = ({ card }: { card: SpeakingCard }) => {
   const [isVocabOpen, setIsVocabOpen] = useState(false);
+  const [isSampleOpen, setIsSampleOpen] = useState(false);
   const [copied, setCopied] = useState(false);
 
   const handleCopy = () => {
@@ -358,11 +359,36 @@ const SpeakingHubCard = ({ card }: { card: SpeakingCard }) => {
         ))}
       </ul>
 
-      <div className="bg-slate-800/50 rounded-2xl p-5 border border-slate-700/50 mb-6">
-        <h4 className="text-[10px] font-black text-blue-400 uppercase tracking-widest mb-3">Band 9.0 Sample Answer</h4>
-        <p className="text-slate-200 text-sm leading-relaxed italic">
-          "{card.sampleAnswer}"
-        </p>
+      <div className="space-y-3 mb-6">
+        <button 
+          onClick={() => setIsSampleOpen(!isSampleOpen)}
+          className={`w-full flex items-center justify-between p-4 rounded-2xl border transition-all text-sm font-bold ${
+            isSampleOpen 
+              ? "bg-blue-500/10 border-blue-500/30 text-blue-400" 
+              : "bg-slate-800/30 border-slate-700/30 text-slate-300 hover:bg-slate-800/50"
+          }`}
+        >
+          {isSampleOpen ? "Hide Sample Answer" : "Show Band 9.0 Sample Answer"}
+          {isSampleOpen ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+        </button>
+
+        <AnimatePresence>
+          {isSampleOpen && (
+            <motion.div
+              initial={{ height: 0, opacity: 0 }}
+              animate={{ height: 'auto', opacity: 1 }}
+              exit={{ height: 0, opacity: 0 }}
+              className="overflow-hidden"
+            >
+              <div className="bg-slate-800/50 rounded-2xl p-5 border border-slate-700/50">
+                <h4 className="text-[10px] font-black text-blue-400 uppercase tracking-widest mb-3">Band 9.0 Sample Answer</h4>
+                <p className="text-slate-200 text-sm leading-relaxed italic">
+                  "{card.sampleAnswer}"
+                </p>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
 
       <div className="space-y-3">
@@ -405,13 +431,23 @@ const SpeakingHubCard = ({ card }: { card: SpeakingCard }) => {
         </AnimatePresence>
       </div>
 
-      <Button 
-        onClick={handleCopy}
-        variant="outline" 
-        className="w-full mt-6 rounded-2xl border-emerald-500/20 bg-emerald-500/5 text-emerald-400 hover:bg-emerald-500 hover:text-white transition-all font-bold"
-      >
-        {copied ? <><Check className="h-4 w-4 mr-2" /> Copied!</> : <><Copy className="h-4 w-4 mr-2" /> Copy Sample Answer</>}
-      </Button>
+      <AnimatePresence>
+        {isSampleOpen && (
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.95 }}
+          >
+            <Button 
+              onClick={handleCopy}
+              variant="outline" 
+              className="w-full mt-6 rounded-2xl border-emerald-500/20 bg-emerald-500/5 text-emerald-400 hover:bg-emerald-500 hover:text-white transition-all font-bold"
+            >
+              {copied ? <><Check className="h-4 w-4 mr-2" /> Copied!</> : <><Copy className="h-4 w-4 mr-2" /> Copy Sample Answer</>}
+            </Button>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </motion.div>
   );
 };
