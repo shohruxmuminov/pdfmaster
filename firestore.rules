@@ -113,14 +113,15 @@ service cloud.firestore {
     }
 
     function isValidMaterial(data) {
-      return hasOnlyAllowedFields(['category', 'subCategory', 'mockTestId', 'name', 'type', 'content', 'timestamp']) &&
+      return hasOnlyAllowedFields(['category', 'subCategory', 'mockTestId', 'name', 'type', 'content', 'timestamp', 'isPremium']) &&
              data.category in ['Listening', 'Reading', 'Writing', 'Speaking', 'Books', 'Vocabulary', 'Mock Tests'] &&
              (!('subCategory' in data) || data.subCategory == null || data.subCategory in ['Listening', 'Reading', 'Writing', 'Speaking']) &&
              (!('mockTestId' in data) || data.mockTestId == null || data.mockTestId is string) &&
              data.name is string && data.name.size() > 0 &&
              data.type is string &&
              data.content is string &&
-             (data.timestamp is number || data.timestamp is timestamp);
+             (data.timestamp is number || data.timestamp is timestamp) &&
+             (!('isPremium' in data) || data.isPremium is bool);
     }
 
     function isValidResult(data) {

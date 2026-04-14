@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect, useMemo } from "react";
 import { useGemini } from "@/src/components/GeminiContext";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/src/components/ui/card";
 import { Button } from "@/src/components/ui/button";
-import { Shield, Check, X, Clock, User, Lock, AlertCircle, Plus, Trash2, FileText, Upload, Eye, List, LogIn, Loader2 } from "lucide-react";
+import { Shield, Check, X, Clock, User, Lock, AlertCircle, Plus, Trash2, FileText, Upload, Eye, List, LogIn, Loader2, Download } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useNavigate } from "react-router-dom";
 
@@ -436,6 +436,66 @@ export default function AdminPanel() {
                     <CardDescription>Add HTML or other files to IELTS sections.</CardDescription>
                   </CardHeader>
                   <CardContent className="p-8">
+                    <div className="mb-8 p-6 bg-blue-50 dark:bg-blue-900/20 rounded-2xl border border-blue-100 dark:border-blue-900/30">
+                      <h3 className="text-lg font-bold text-blue-800 dark:text-blue-300 mb-2">Import from Wisdom2</h3>
+                      <p className="text-sm text-blue-600 dark:text-blue-400 mb-4">Quickly import all reading materials from your previous website (wisdom2.netlify.app).</p>
+                      <Button 
+                        onClick={async () => {
+                          try {
+                            setError("");
+                            setSuccess("Importing materials...");
+                            const { collection, addDoc } = await import("firebase/firestore");
+                            const { db } = await import("../firebase");
+                            
+                            const freeMaterials = [
+                              {title:"IELTS with Jurabek - Reading Test 1",url:"/reading/IELTSwithJurabek Reading.html"},
+                              {title:"IELTS with Jurabek - Reading Test 2",url:"/reading/IELTSwithJurabek.html"},
+                              {title:"CDI Full Reading",url:"/reading/CDI Full reading.html"},
+                              {title:"CDI Reading",url:"/reading/CDI Reading.html"}
+                            ];
+
+                            const premiumMaterials = [
+                              {title:"Premium Full Reading 1",url:"/reading/premiumreading/IELTSwithJurabek FULL Reading 1.html"},
+                              {title:"Premium Full Reading 2",url:"/reading/premiumreading/IELTSwithJurabek Reading full 2.html"},
+                              {title:"Premium Full Reading 3",url:"/reading/premiumreading/IELTSwithJurabek Full reading 3.html"},
+                              {title:"Premium Full Reading 4",url:"/reading/premiumreading/IELTSwithJurabek Full reading 4.html"},
+                              {title:"Premium Full Reading 5",url:"/reading/premiumreading/IELTSwithJurabek full reading 5.html"},
+                              {title:"Premium Full Reading 6",url:"/reading/premiumreading/IELTSwithJurabek FULL Reading 6.html"},
+                              {title:"Premium Full Reading 7",url:"/reading/premiumreading/IELTSwithJurabek Reading full 7.html"},
+                              {title:"Premium Full Reading 8",url:"/reading/premiumreading/Full reading 8.html"},
+                              {title:"Premium Full Reading 9 (3 Passages)",url:"/reading/premiumreading/Full Reading 12.html"},
+                              {title:"Premium Full Reading 10",url:"/reading/premiumreading/Full reading 10.html"},
+                              {title:"Premium Full Reading 11",url:"/reading/premiumreading/IELTSwithJurabek FULL Reading 11.html"},
+                              {title:"Premium Full Reading 12",url:"/reading/premiumreading/Full Reading 12.html"}
+                            ];
+
+                            const allMaterials = [
+                              ...freeMaterials.map(m => ({...m, category: "Reading", isPremium: false})),
+                              ...premiumMaterials.map(m => ({...m, category: "Reading", isPremium: true}))
+                            ];
+
+                            for (const mat of allMaterials) {
+                              await addDoc(collection(db, "materials"), {
+                                name: mat.title,
+                                category: mat.category,
+                                subCategory: "Reading",
+                                type: "text/html",
+                                content: "https://wisdom2.netlify.app" + mat.url.replace(/ /g, "%20"),
+                                timestamp: Date.now(),
+                                isPremium: mat.isPremium
+                              });
+                            }
+                            setSuccess("Successfully imported " + allMaterials.length + " materials from Wisdom2!");
+                          } catch (err: any) {
+                            setError("Import failed: " + err.message);
+                          }
+                        }}
+                        className="bg-blue-600 hover:bg-blue-700 text-white rounded-xl"
+                      >
+                        <Download className="h-4 w-4 mr-2" /> Import Materials
+                      </Button>
+                    </div>
+
                     {error && (
                       <div className="mb-6 flex items-center gap-2 text-red-600 dark:text-red-400 text-sm bg-red-50 dark:bg-red-900/20 p-4 rounded-xl border border-red-100 dark:border-red-900/30">
                         <AlertCircle className="h-5 w-5 shrink-0" />
@@ -617,9 +677,10 @@ export default function AdminPanel() {
                         <th className="p-4 font-bold text-sm text-slate-600 dark:text-slate-400">Username</th>
                         <th className="p-4 font-bold text-sm text-slate-600 dark:text-slate-400">Telegram</th>
                         <th className="p-4 font-bold text-sm text-slate-600 dark:text-slate-400">Material</th>
+                        <th className="p-4 font-bold text-sm text-slate-600 dark:text-slate-400">Component</th>
                         <th className="p-4 font-bold text-sm text-slate-600 dark:text-slate-400">Score</th>
                         <th className="p-4 font-bold text-sm text-slate-600 dark:text-slate-400">Band</th>
-                        <th className="p-4 font-bold text-sm text-slate-600 dark:text-slate-400">Writing</th>
+                        <th className="p-4 font-bold text-sm text-slate-600 dark:text-slate-400">Content/Feedback</th>
                         <th className="p-4 font-bold text-sm text-slate-600 dark:text-slate-400">Date</th>
                       </tr>
                     </thead>
@@ -631,25 +692,27 @@ export default function AdminPanel() {
                             <td className="p-4 text-xs text-slate-500">{result.userName}</td>
                             <td className="p-4 text-blue-600 dark:text-blue-400">{result.telegramUsername}</td>
                             <td className="p-4 text-slate-600 dark:text-slate-400">{result.materialName}</td>
+                            <td className="p-4 text-slate-600 dark:text-slate-400">{result.component}</td>
                             <td className="p-4 font-bold text-blue-600">{result.score}</td>
                             <td className="p-4 font-black text-green-600">{result.bandScore || "N/A"}</td>
                             <td className="p-4">
-                              {((result as any).writingTask1 || (result as any).writingTask2) ? (
+                              {(result.content || result.aiFeedback) ? (
                                 <Button 
                                   variant="ghost" 
                                   size="sm" 
                                   className="text-blue-600 h-8 px-2 text-[10px] font-bold uppercase tracking-widest"
                                   onClick={() => {
-                                    const text = `STUDENT: ${result.firstName} ${result.lastName}\nUSERNAME: ${result.userName}\nTELEGRAM: ${result.telegramUsername}\nTEST: ${result.materialName}\nDATE: ${new Date(result.timestamp).toLocaleString()}\n\nWriting Task 1:\n${result.writingTask1 || 'N/A'}\n\nWriting Task 2:\n${result.writingTask2 || 'N/A'}\n\nAI EVALUATION:\n${result.aiFeedback || 'N/A'}`;
+                                    const text = `STUDENT: ${result.firstName} ${result.lastName}\nUSERNAME: ${result.userName}\nTELEGRAM: ${result.telegramUsername}\nTEST: ${result.materialName}\nCOMPONENT: ${result.component}\nDATE: ${new Date(result.timestamp).toLocaleString()}\n\nCONTENT:\n${result.content || 'N/A'}\n\nAI EVALUATION:\n${result.aiFeedback || 'N/A'}`;
                                     const blob = new Blob([text], { type: 'text/plain' });
                                     const url = URL.createObjectURL(blob);
                                     const link = document.createElement('a');
                                     link.href = url;
-                                    link.download = `${result.firstName}_${result.lastName}_Evaluation.txt`;
+                                    link.download = `${result.firstName}_${result.lastName}_${result.component}_Evaluation.txt`;
                                     link.click();
+                                    URL.revokeObjectURL(url);
                                   }}
                                 >
-                                  Download Evaluation
+                                  Download
                                 </Button>
                               ) : "N/A"}
                             </td>

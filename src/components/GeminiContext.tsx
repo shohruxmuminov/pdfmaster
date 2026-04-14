@@ -41,6 +41,7 @@ interface Material {
   type: string; // mimeType
   content: string; // This will now store the download URL from Storage
   timestamp: number;
+  isPremium?: boolean;
 }
 
 interface UserResult {
@@ -50,10 +51,12 @@ interface UserResult {
   telegramUsername: string;
   materialId: string;
   materialName: string;
-  score: string;
+  component: "Listening" | "Reading" | "Writing" | "Speaking";
+  score?: string;
   bandScore?: string;
   writingTask1?: string;
   writingTask2?: string;
+  content?: string;
   aiFeedback?: string;
   timestamp: number;
   userId: string;
@@ -555,8 +558,7 @@ export function GeminiProvider({ children }: { children: React.ReactNode }) {
       let bandScore = "";
 
       // Automated Band Score for Listening/Reading
-      const material = materials.find(m => m.id === result.materialId);
-      if (material && (material.category === "Listening" || material.category === "Reading" || material.subCategory === "Listening" || material.subCategory === "Reading")) {
+      if ((result.component === "Listening" || result.component === "Reading") && result.score) {
         const rawScoreMatch = result.score.match(/^(\d+)/);
         if (rawScoreMatch) {
           const rawScore = parseInt(rawScoreMatch[1]);
@@ -564,11 +566,10 @@ export function GeminiProvider({ children }: { children: React.ReactNode }) {
         }
       }
       
-      // If writing tasks are present, get AI feedback
-      if (result.writingTask1 || result.writingTask2) {
-        const feedback1 = result.writingTask1 ? await gradeWritingTask(1, result.writingTask1) : "";
-        const feedback2 = result.writingTask2 ? await gradeWritingTask(2, result.writingTask2) : "";
-        aiFeedback = `### TASK 1 EVALUATION\n${feedback1}\n\n---\n\n### TASK 2 EVALUATION\n${feedback2}`;
+      // If writing task is present, get AI feedback
+      if (result.component === "Writing" && result.content) {
+        // Assuming taskType 2 for generic writing tasks if not specified
+        aiFeedback = await gradeWritingTask(2, result.content) || "AI Grading failed.";
       }
 
       await addDoc(collection(db, "results"), {

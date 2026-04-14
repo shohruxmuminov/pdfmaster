@@ -31,7 +31,8 @@ import {
   Trophy,
   Ban,
   Lock,
-  AlertTriangle
+  AlertTriangle,
+  Star
 } from "lucide-react";
 
 export default function IELTSSection() {
@@ -45,8 +46,8 @@ export default function IELTSSection() {
     lastName: "", 
     telegramUsername: "", 
     score: "",
-    writingTask1: "",
-    writingTask2: ""
+    component: "Listening" as "Listening" | "Reading" | "Writing" | "Speaking",
+    content: ""
   });
   const [isSubmitted, setIsSubmitted] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
@@ -248,6 +249,11 @@ export default function IELTSSection() {
     return m.category.toLowerCase() === cat;
   });
 
+  const freeMaterials = sectionMaterials.filter(m => !m.isPremium);
+  const premiumMaterials = sectionMaterials.filter(m => m.isPremium);
+
+  const [activeTab, setActiveTab] = useState<"free" | "premium">("free");
+
   const groupedMockTests = useMemo(() => {
     if (category?.toLowerCase() !== "mock-tests") return null;
     
@@ -276,7 +282,7 @@ export default function IELTSSection() {
   }, [category, sectionMaterials]);
   
   const filteredMaterials = useMemo(() => {
-    const baseList = category?.toLowerCase() === "mock-tests" ? (groupedMockTests || []) : sectionMaterials;
+    const baseList = category?.toLowerCase() === "mock-tests" ? (groupedMockTests || []) : (activeTab === "free" ? freeMaterials : premiumMaterials);
     return baseList
       .filter(m => m.name.toLowerCase().includes(searchQuery.toLowerCase()))
       .filter(m => {
@@ -286,7 +292,7 @@ export default function IELTSSection() {
         }
         return m.name.includes(activeFilter);
       });
-  }, [sectionMaterials, groupedMockTests, searchQuery, activeFilter, category]);
+  }, [freeMaterials, premiumMaterials, groupedMockTests, searchQuery, activeFilter, category, activeTab]);
 
   const sidebarFilters = useMemo(() => {
     const counts: Record<string, number> = { "All Tests": sectionMaterials.length };
@@ -363,8 +369,8 @@ export default function IELTSSection() {
       lastName: user?.displayName?.split(' ')[1] || "", 
       telegramUsername: "", 
       score: "",
-      writingTask1: "",
-      writingTask2: ""
+      component: "Listening",
+      content: ""
     });
     setTimeLeft(3600);
     setIsTimerActive(true);
@@ -557,6 +563,28 @@ export default function IELTSSection() {
                 <main className="flex-1">
                   {sectionConfig.type === "standard" && (
                     <div className="flex flex-col md:flex-row md:items-center justify-between mb-8 gap-4">
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => setActiveTab("free")}
+                          className={`px-6 py-3 rounded-2xl font-bold text-sm transition-all ${
+                            activeTab === "free" 
+                              ? "bg-blue-600 text-white shadow-lg shadow-blue-600/20" 
+                              : "bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-400 border border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800"
+                          }`}
+                        >
+                          Free Tests
+                        </button>
+                        <button
+                          onClick={() => setActiveTab("premium")}
+                          className={`px-6 py-3 rounded-2xl font-bold text-sm transition-all flex items-center gap-2 ${
+                            activeTab === "premium" 
+                              ? "bg-amber-500 text-white shadow-lg shadow-amber-500/20" 
+                              : "bg-white dark:bg-slate-900 text-amber-600 dark:text-amber-500 border border-amber-200 dark:border-amber-900/30 hover:bg-amber-50 dark:hover:bg-amber-900/10"
+                          }`}
+                        >
+                          <Star className="h-4 w-4" /> Premium
+                        </button>
+                      </div>
                       <div className="relative flex-1 max-w-md">
                         <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
                         <input 
@@ -635,10 +663,17 @@ export default function IELTSSection() {
                           ) : (
                             <div className="p-6">
                               <div className="flex items-start justify-between mb-4">
-                                <div className={`px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider bg-green-100 text-green-600 dark:bg-green-900/30 dark:text-green-400 flex items-center gap-1`}>
-                                  <CheckCircle2 className="h-3 w-3" />
-                                  Free
-                                </div>
+                                {(material as any).isPremium ? (
+                                  <div className={`px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider bg-amber-100 text-amber-600 dark:bg-amber-900/30 dark:text-amber-400 flex items-center gap-1`}>
+                                    <Star className="h-3 w-3" />
+                                    Premium
+                                  </div>
+                                ) : (
+                                  <div className={`px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider bg-green-100 text-green-600 dark:bg-green-900/30 dark:text-green-400 flex items-center gap-1`}>
+                                    <CheckCircle2 className="h-3 w-3" />
+                                    Free
+                                  </div>
+                                )}
                                 {index < 3 && (
                                   <div className="px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400">
                                     New
@@ -824,14 +859,7 @@ export default function IELTSSection() {
                                 setMockTestIndex(nextIndex);
                                 setSelectedMaterial(activeMockTest[nextIndex]);
                                 setIsSubmitted(false);
-                                setResultForm({ 
-                                  firstName: "", 
-                                  lastName: "", 
-                                  telegramUsername: "", 
-                                  score: "",
-                                  writingTask1: "",
-                                  writingTask2: ""
-                                });
+                                setResultForm({ firstName: "", lastName: "", telegramUsername: "", score: "", component: "Listening", content: "" });
                                 setTimeLeft(3600);
                               }} 
                               className="rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold"
@@ -877,6 +905,19 @@ export default function IELTSSection() {
                           />
                         </div>
                         <div className="space-y-2">
+                          <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Test Component</label>
+                          <select 
+                            value={resultForm.component}
+                            onChange={(e) => setResultForm({...resultForm, component: e.target.value as any})}
+                            className="w-full px-4 py-3 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-800 focus:ring-2 focus:ring-blue-500 outline-none"
+                          >
+                            <option value="Listening">Listening</option>
+                            <option value="Reading">Reading</option>
+                            <option value="Writing">Writing</option>
+                            <option value="Speaking">Speaking</option>
+                          </select>
+                        </div>
+                        <div className="space-y-2">
                           <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Your Score</label>
                           <input 
                             required
@@ -887,29 +928,17 @@ export default function IELTSSection() {
                             placeholder="e.g. 7.5"
                           />
                         </div>
-                        {sectionConfig.type === "writing" && (
-                          <>
-                            <div className="md:col-span-2 space-y-2">
-                              <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Writing Task 1 Essay</label>
-                              <textarea 
-                                required
-                                value={resultForm.writingTask1}
-                                onChange={(e) => setResultForm({...resultForm, writingTask1: e.target.value})}
-                                className="w-full px-4 py-3 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-800 focus:ring-2 focus:ring-blue-500 outline-none min-h-[200px]"
-                                placeholder="Paste your Task 1 essay here..."
-                              />
-                            </div>
-                            <div className="md:col-span-2 space-y-2">
-                              <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Writing Task 2 Essay</label>
-                              <textarea 
-                                required
-                                value={resultForm.writingTask2}
-                                onChange={(e) => setResultForm({...resultForm, writingTask2: e.target.value})}
-                                className="w-full px-4 py-3 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-800 focus:ring-2 focus:ring-blue-500 outline-none min-h-[300px]"
-                                placeholder="Paste your Task 2 essay here..."
-                              />
-                            </div>
-                          </>
+                        {resultForm.component === "Writing" && (
+                          <div className="md:col-span-2 space-y-2">
+                            <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Writing Essay</label>
+                            <textarea 
+                              required
+                              value={resultForm.content}
+                              onChange={(e) => setResultForm({...resultForm, content: e.target.value})}
+                              className="w-full px-4 py-3 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-800 focus:ring-2 focus:ring-blue-500 outline-none min-h-[300px]"
+                              placeholder="Paste your essay here..."
+                            />
+                          </div>
                         )}
                         <div className="md:col-span-2 pt-4">
                           <Button type="submit" className={`w-full h-12 rounded-xl ${sectionConfig.buttonColor} text-white text-lg font-bold shadow-lg`}>
