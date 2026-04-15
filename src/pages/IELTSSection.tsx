@@ -5,8 +5,10 @@ import { Button } from "@/src/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/src/components/ui/card";
 import { motion, AnimatePresence } from "framer-motion";
 import { AITutorModal } from "@/src/components/AITutorModal";
+import { MockTestRunner } from "@/src/components/MockTestRunner";
 import { SpeakingControls } from "@/src/components/SpeakingControls";
 import { SpeakingPracticeHub } from "@/src/components/SpeakingPracticeHub";
+import { ReadingPractice } from "@/src/components/ReadingPractice";
 import { 
   FileText, 
   Play, 
@@ -58,6 +60,32 @@ export default function IELTSSection() {
   const [timeLeft, setTimeLeft] = useState(3600);
   const [isTimerActive, setIsTimerActive] = useState(false);
   const viewerRef = useRef<HTMLDivElement>(null);
+
+  // Mock data for Reading practice
+  const readingPassage = {
+    id: "1",
+    title: "The Impact of Climate Change on Marine Life",
+    content: "Climate change is significantly altering marine ecosystems across the globe. Rising ocean temperatures, acidification, and deoxygenation are creating stressors that many marine species are unable to adapt to. Coral reefs, often referred to as the rainforests of the sea, are particularly vulnerable. As temperatures rise, corals experience bleaching, a process where they expel the symbiotic algae living in their tissues. If the stress persists, the corals die, leading to a collapse of the entire reef ecosystem. Furthermore, ocean acidification, caused by the absorption of excess carbon dioxide, hinders the ability of calcifying organisms like mollusks and crustaceans to build their shells, threatening the foundation of marine food webs.",
+    questions: [
+      {
+        id: 1,
+        text: "What is the primary cause of coral bleaching mentioned in the text?",
+        options: ["Ocean acidification", "Rising ocean temperatures", "Deoxygenation", "Overfishing"],
+        correctAnswer: 1
+      },
+      {
+        id: 2,
+        text: "How does ocean acidification affect calcifying organisms?",
+        options: ["It helps them build shells faster", "It has no effect on their shell-building", "It hinders their ability to build shells", "It causes them to migrate to colder waters"],
+        correctAnswer: 2
+      }
+    ]
+  };
+
+  const handleReadingSubmit = (answers: Record<number, number>) => {
+    console.log("Answers submitted:", answers);
+    setIsSubmitted(true);
+  };
 
   // Blocked user check
   if (isBlocked && role !== "admin" && role !== "teacher") {
@@ -264,7 +292,7 @@ export default function IELTSSection() {
       groups[id].push(m);
     });
     
-    const order = ["Listening", "Reading", "Writing"];
+    const order = ["Listening", "Reading", "Writing", "Speaking"];
     return Object.entries(groups).map(([id, components]) => {
       const sorted = [...components].sort((a, b) => {
         const indexA = order.indexOf(a.subCategory || "");
@@ -755,69 +783,251 @@ export default function IELTSSection() {
               ref={viewerRef}
               className={`relative bg-white dark:bg-slate-900 overflow-hidden shadow-2xl group/viewer flex flex-col ${isFullscreen ? "w-screen h-screen rounded-none" : "rounded-3xl border border-slate-200 dark:border-slate-800"}`}
             >
-              {/* Header - Show a simplified version in fullscreen or normal mode if test is active */}
-              <div className={`p-4 ${sectionConfig.color} text-white flex items-center justify-between shrink-0 z-[60] relative shadow-lg`}>
-                <div className="flex items-center gap-3">
-                  <div className="bg-white/20 p-2 rounded-xl backdrop-blur-md">
-                    {sectionConfig.icon}
-                  </div>
-                  <div>
-                    <h2 className="font-black text-sm md:text-base tracking-tight">
-                      {activeMockTest ? `${activeMockTest[0].mockTestId}: ${selectedMaterial.subCategory}` : selectedMaterial.name}
-                    </h2>
-                    <div className="flex items-center gap-2">
-                      <span className="text-[10px] font-black uppercase tracking-widest opacity-70">
-                        {activeMockTest ? `Part ${mockTestIndex + 1} of ${activeMockTest.length}` : `IELTS ${category} Practice`}
-                      </span>
-                      {isTimerActive && (
-                        <span className="flex items-center gap-1 px-2 py-0.5 bg-green-500/30 rounded-full text-[8px] font-black uppercase tracking-widest animate-pulse">
-                          <div className="w-1 h-1 bg-green-400 rounded-full" /> Live Test
-                        </span>
+              {category?.toLowerCase() === "mock-tests" && selectedMaterial ? (
+                <MockTestRunner 
+                  testId={selectedMaterial.id} 
+                  components={activeMockTest || []} 
+                  onComplete={async (results) => { 
+                    try {
+                      const [firstName, ...lastNameParts] = (user?.displayName || "User").split(" ");
+                      const lastName = lastNameParts.join(" ") || "Student";
+                      
+                      // Submit each section result
+                      for (const [section, data] of Object.entries(results)) {
+                        const sectionData = data as any;
+                        await submitResult({
+                          firstName,
+                          lastName,
+                          telegramUsername: user?.email || "unknown",
+                          materialId: selectedMaterial.id,
+                          materialName: selectedMaterial.name,
+                          component: section as any,
+                          score: sectionData.score.toString(),
+                          bandScore: sectionData.bandScore,
+                          content: sectionData.feedback,
+                        });
+                      }
+                      handleBack();
+                    } catch (error) {
+                      console.error("Error submitting mock test results:", error);
+                      handleBack();
+                    }
+                  }} 
+                />
+              ) : category?.toLowerCase() === "reading" && !isSubmitted ? (
+                <ReadingPractice passage={readingPassage} onSubmit={handleReadingSubmit} />
+              ) : (
+                <>
+                  {/* Header - Show a simplified version in fullscreen or normal mode if test is active */}
+                  <div className={`p-4 ${sectionConfig.color} text-white flex items-center justify-between shrink-0 z-[60] relative shadow-lg`}>
+                    <div className="flex items-center gap-3">
+                      <div className="bg-white/20 p-2 rounded-xl backdrop-blur-md">
+                        {sectionConfig.icon}
+                      </div>
+                      <div>
+                        <h2 className="font-black text-sm md:text-base tracking-tight">
+                          {activeMockTest ? `${activeMockTest[0].mockTestId}: ${selectedMaterial.subCategory}` : selectedMaterial.name}
+                        </h2>
+                        <div className="flex items-center gap-2">
+                          <span className="text-[10px] font-black uppercase tracking-widest opacity-70">
+                            {activeMockTest ? `Part ${mockTestIndex + 1} of ${activeMockTest.length}` : `IELTS ${category} Practice`}
+                          </span>
+                          {isTimerActive && (
+                            <span className="flex items-center gap-1 px-2 py-0.5 bg-green-500/30 rounded-full text-[8px] font-black uppercase tracking-widest animate-pulse">
+                              <div className="w-1 h-1 bg-green-400 rounded-full" /> Live Test
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                    
+                    <div className="flex items-center gap-3">
+                      <div className={`flex items-center gap-2 px-4 py-2 rounded-xl font-mono font-black text-lg md:text-xl backdrop-blur-md border ${timeLeft < 300 ? 'bg-red-500/30 text-white border-red-400 animate-pulse' : 'bg-white/10 text-white border-white/10'}`}>
+                        <Clock className="h-5 w-5" />
+                        {category?.toLowerCase() === "books" || category?.toLowerCase() === "vocabulary" || category?.toLowerCase() === "mock-tests" ? "Study Mode" : formatTime(timeLeft)}
+                      </div>
+                      
+                      {!isFullscreen && (
+                        <div className="hidden md:flex items-center gap-2">
+                          <Button 
+                            variant="secondary" 
+                            size="sm" 
+                            onClick={() => setIsAITutorOpen(true)}
+                            className="rounded-xl bg-white/10 hover:bg-white/20 border-none text-white font-black text-xs h-10 px-4"
+                          >
+                            <Bot className="h-4 w-4 mr-2" /> Gemini AI
+                          </Button>
+                          <Button 
+                            variant="secondary" 
+                            size="icon" 
+                            onClick={toggleFullscreen}
+                            className="rounded-xl bg-white/10 hover:bg-white/20 border-none text-white h-10 w-10"
+                          >
+                            <Maximize2 className="h-4 w-4" />
+                          </Button>
+                        </div>
                       )}
                     </div>
                   </div>
-                </div>
-                
-                <div className="flex items-center gap-3">
-                  <div className={`flex items-center gap-2 px-4 py-2 rounded-xl font-mono font-black text-lg md:text-xl backdrop-blur-md border ${timeLeft < 300 ? 'bg-red-500/30 text-white border-red-400 animate-pulse' : 'bg-white/10 text-white border-white/10'}`}>
-                    <Clock className="h-5 w-5" />
-                    {category?.toLowerCase() === "books" || category?.toLowerCase() === "vocabulary" || category?.toLowerCase() === "mock-tests" ? "Study Mode" : formatTime(timeLeft)}
+
+                  {/* Progress Bar - Always Persistent */}
+                  <div className="w-full h-2 bg-slate-100 dark:bg-slate-800 shrink-0 relative z-[60] overflow-hidden">
+                    <motion.div 
+                      className={`h-full ${sectionConfig.color} shadow-[0_0_15px_rgba(0,0,0,0.2)] relative`}
+                      initial={{ width: 0 }}
+                      animate={{ width: `${progress}%` }}
+                      transition={{ duration: 0.5, ease: "linear" }}
+                    >
+                      <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent animate-shimmer" style={{ backgroundSize: '200% 100%' }} />
+                    </motion.div>
                   </div>
-                  
-                  {!isFullscreen && (
-                    <div className="hidden md:flex items-center gap-2">
-                      <Button 
-                        variant="secondary" 
-                        size="sm" 
-                        onClick={() => setIsAITutorOpen(true)}
-                        className="rounded-xl bg-white/10 hover:bg-white/20 border-none text-white font-black text-xs h-10 px-4"
-                      >
-                        <Bot className="h-4 w-4 mr-2" /> Gemini AI
-                      </Button>
-                      <Button 
-                        variant="secondary" 
-                        size="icon" 
-                        onClick={toggleFullscreen}
-                        className="rounded-xl bg-white/10 hover:bg-white/20 border-none text-white h-10 w-10"
-                      >
-                        <Maximize2 className="h-4 w-4" />
-                      </Button>
+
+                  <div className="relative flex-1 min-h-0">
+                    {selectedMaterial.type.includes("html") ? (
+                      <iframe 
+                        src={selectedMaterial.content.startsWith('http') ? selectedMaterial.content : undefined}
+                        srcDoc={selectedMaterial.content.startsWith('http') ? undefined : selectedMaterial.content} 
+                        className="w-full h-full border-none bg-white"
+                        title={selectedMaterial.name}
+                        tabIndex={-1}
+                      />
+                    ) : (
+                      <div className="flex flex-col items-center justify-center p-12 text-center h-full">
+                        <FileText className={`h-20 w-20 ${sectionConfig.textColor} mb-6`} />
+                        <h3 className="text-2xl font-bold mb-4">File Material</h3>
+                        <p className="text-slate-500 mb-8 max-w-md">This is a downloadable material. Click the button below to view or download it.</p>
+                        <Button asChild size="lg" className={`${sectionConfig.buttonColor} text-white rounded-xl px-8`}>
+                          <a href={selectedMaterial.content} download={selectedMaterial.name}>Download File</a>
+                        </Button>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Submission Form - Always show when a material is selected */}
+                  {selectedMaterial && (
+                    <div className="p-8 bg-slate-50 dark:bg-slate-900/50 border-t border-slate-200 dark:border-slate-800 shrink-0">
+                      <div className="max-w-2xl mx-auto">
+                        <div className="text-center mb-8">
+                          <h3 className="text-2xl font-bold mb-2">Submit Your Result</h3>
+                          <p className="text-slate-500">Record your score to track your progress over time.</p>
+                        </div>
+                        {isSubmitted ? (
+                          <div className="text-center py-8">
+                            <div className="w-16 h-16 bg-green-100 dark:bg-green-900/30 rounded-full flex items-center justify-center mx-auto mb-4">
+                              <CheckCircle2 className="h-8 w-8 text-green-600" />
+                            </div>
+                            <h3 className="text-xl font-bold text-slate-900 dark:text-white mb-2">Result Submitted!</h3>
+                            <p className="text-slate-500 mb-6">Your score has been recorded successfully.</p>
+                            <div className="flex items-center justify-center gap-4">
+                              <Button onClick={handleBack} variant="outline" className="rounded-xl">Back to Materials</Button>
+                              {activeMockTest && mockTestIndex < activeMockTest.length - 1 && (
+                                <Button 
+                                  onClick={() => {
+                                    const nextIndex = mockTestIndex + 1;
+                                    setMockTestIndex(nextIndex);
+                                    setSelectedMaterial(activeMockTest[nextIndex]);
+                                    setIsSubmitted(false);
+                                    setResultForm({ firstName: "", lastName: "", telegramUsername: "", score: "", component: "Listening", content: "" });
+                                    setTimeLeft(3600);
+                                  }} 
+                                  className="rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold"
+                                >
+                                  Next Section: {activeMockTest[mockTestIndex + 1].subCategory}
+                                </Button>
+                              )}
+                            </div>
+                          </div>
+                        ) : (
+                          <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <div className="space-y-2">
+                              <label className="text-sm font-medium text-slate-700 dark:text-slate-300">First Name</label>
+                              <input 
+                                required
+                                type="text" 
+                                value={resultForm.firstName}
+                                onChange={(e) => setResultForm({...resultForm, firstName: e.target.value})}
+                                className="w-full px-4 py-3 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-800 focus:ring-2 focus:ring-blue-500 outline-none"
+                                placeholder="John"
+                              />
+                            </div>
+                            <div className="space-y-2">
+                              <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Last Name</label>
+                              <input 
+                                required
+                                type="text" 
+                                value={resultForm.lastName}
+                                onChange={(e) => setResultForm({...resultForm, lastName: e.target.value})}
+                                className="w-full px-4 py-3 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-800 focus:ring-2 focus:ring-blue-500 outline-none"
+                                placeholder="Doe"
+                              />
+                            </div>
+                            <div className="space-y-2">
+                              <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Telegram Username</label>
+                              <input 
+                                required
+                                type="text" 
+                                value={resultForm.telegramUsername}
+                                onChange={(e) => setResultForm({...resultForm, telegramUsername: e.target.value})}
+                                className="w-full px-4 py-3 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-800 focus:ring-2 focus:ring-blue-500 outline-none"
+                                placeholder="@username"
+                              />
+                            </div>
+                            <div className="space-y-2">
+                              <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Test Component</label>
+                              <select 
+                                value={resultForm.component}
+                                onChange={(e) => setResultForm({...resultForm, component: e.target.value as any})}
+                                className="w-full px-4 py-3 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-800 focus:ring-2 focus:ring-blue-500 outline-none"
+                              >
+                                <option value="Listening">Listening</option>
+                                <option value="Reading">Reading</option>
+                                <option value="Writing">Writing</option>
+                                <option value="Speaking">Speaking</option>
+                              </select>
+                            </div>
+                            <div className="space-y-2">
+                              <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Your Score</label>
+                              <input 
+                                required
+                                type="text" 
+                                value={resultForm.score}
+                                onChange={(e) => setResultForm({...resultForm, score: e.target.value})}
+                                className="w-full px-4 py-3 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-800 focus:ring-2 focus:ring-blue-500 outline-none"
+                                placeholder="e.g. 7.5"
+                              />
+                            </div>
+                            {resultForm.component === "Writing" && (
+                              <div className="md:col-span-2 space-y-2">
+                                <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Writing Essay</label>
+                                <textarea 
+                                  required
+                                  value={resultForm.content}
+                                  onChange={(e) => setResultForm({...resultForm, content: e.target.value})}
+                                  className="w-full px-4 py-3 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-800 focus:ring-2 focus:ring-blue-500 outline-none min-h-[300px]"
+                                  placeholder="Paste your essay here..."
+                                />
+                              </div>
+                            )}
+                            <div className="md:col-span-2 pt-4 flex gap-4">
+                              <Button type="submit" className={`flex-1 h-12 rounded-xl ${sectionConfig.buttonColor} text-white text-lg font-bold shadow-lg`}>
+                                <Send className="h-5 w-5 mr-2" /> Submit Result
+                              </Button>
+                              {activeMockTest && (
+                                <Button type="button" onClick={() => {
+                                  // Logic to submit all mock test sections
+                                  alert("Submit All functionality is being implemented.");
+                                }} className="flex-1 h-12 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-lg font-bold shadow-lg">
+                                  <Send className="h-5 w-5 mr-2" /> Submit All
+                                </Button>
+                              )}
+                            </div>
+                          </form>
+                        )}
+                      </div>
                     </div>
                   )}
-                </div>
-              </div>
-
-              {/* Progress Bar - Always Persistent */}
-              <div className="w-full h-2 bg-slate-100 dark:bg-slate-800 shrink-0 relative z-[60] overflow-hidden">
-                <motion.div 
-                  className={`h-full ${sectionConfig.color} shadow-[0_0_15px_rgba(0,0,0,0.2)] relative`}
-                  initial={{ width: 0 }}
-                  animate={{ width: `${progress}%` }}
-                  transition={{ duration: 0.5, ease: "linear" }}
-                >
-                  <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent animate-shimmer" style={{ backgroundSize: '200% 100%' }} />
-                </motion.div>
-              </div>
+                </>
+              )}
 
               <div className="relative flex-1 min-h-0">
                 {selectedMaterial.type.includes("html") ? (
@@ -840,8 +1050,8 @@ export default function IELTSSection() {
                 )}
               </div>
 
-              {/* Submission Form - Only show when not in fullscreen or at the bottom of scroll */}
-              {!isFullscreen && (
+              {/* Submission Form - Always show when a material is selected */}
+              {selectedMaterial && (
                 <div className="p-8 bg-slate-50 dark:bg-slate-900/50 border-t border-slate-200 dark:border-slate-800 shrink-0">
                   <div className="max-w-2xl mx-auto">
                     <div className="text-center mb-8">
@@ -945,10 +1155,18 @@ export default function IELTSSection() {
                             />
                           </div>
                         )}
-                        <div className="md:col-span-2 pt-4">
-                          <Button type="submit" className={`w-full h-12 rounded-xl ${sectionConfig.buttonColor} text-white text-lg font-bold shadow-lg`}>
+                        <div className="md:col-span-2 pt-4 flex gap-4">
+                          <Button type="submit" className={`flex-1 h-12 rounded-xl ${sectionConfig.buttonColor} text-white text-lg font-bold shadow-lg`}>
                             <Send className="h-5 w-5 mr-2" /> Submit Result
                           </Button>
+                          {activeMockTest && (
+                            <Button type="button" onClick={() => {
+                              // Logic to submit all mock test sections
+                              alert("Submit All functionality is being implemented.");
+                            }} className="flex-1 h-12 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-lg font-bold shadow-lg">
+                              <Send className="h-5 w-5 mr-2" /> Submit All
+                            </Button>
+                          )}
                         </div>
                       </form>
                     )}

@@ -52,7 +52,8 @@ export default function AdminPanel() {
       const match = m.mockTestId?.match(/Mock Test (\d+)/);
       return match ? parseInt(match[1]) : 0;
     });
-    return ids.length > 0 ? Math.max(...ids) + 1 : 1;
+    const maxId = ids.length > 0 ? Math.max(...ids) : 0;
+    return maxId + 1;
   }, [materials]);
 
   useEffect(() => {
@@ -73,10 +74,12 @@ export default function AdminPanel() {
     Listening: File | null;
     Reading: File | null;
     Writing: File | null;
+    Speaking: File | null;
   }>({
     Listening: null,
     Reading: null,
-    Writing: null
+    Writing: null,
+    Speaking: null
   });
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -127,9 +130,17 @@ export default function AdminPanel() {
     
     try {
       if (materialForm.category === "Mock Tests") {
-        const sections = ["Listening", "Reading", "Writing"] as const;
-        const mockName = `Mock Test ${nextMockNumber}`;
-        const uploadPromises = sections.map(async (section) => {
+        const sections = ["Listening", "Reading", "Writing", "Speaking"] as const;
+        const selectedSections = sections.filter(s => mockTestFiles[s]);
+        
+        if (selectedSections.length === 0) {
+          setError("Please select at least one file for the mock test.");
+          setIsUploading(false);
+          return;
+        }
+
+        const mockName = materialForm.name || `Mock Test ${nextMockNumber}`;
+        const uploadPromises = selectedSections.map(async (section) => {
           const file = mockTestFiles[section];
           if (file) {
             return addMaterial({
@@ -144,28 +155,28 @@ export default function AdminPanel() {
         });
         await Promise.all(uploadPromises);
       } else {
-        if (!selectedFile) {
-          setError("Please select a file first.");
+        if (!selectedFile && !fileContent) {
+          setError("Please select a file or paste HTML content first.");
           setIsUploading(false);
           return;
         }
         const isAutoName = materialForm.category === "Books" || materialForm.category === "Vocabulary";
         
         await addMaterial({
-          name: isAutoName ? fileName : materialForm.name,
+          name: isAutoName ? (fileName || "Manual Material") : materialForm.name,
           category: materialForm.category,
           subCategory: (materialForm.category === "Books") ? materialForm.subCategory : undefined,
           mockTestId: undefined,
-          type: fileType,
+          type: fileType || "text/html",
           content: ""
-        }, selectedFile);
+        }, selectedFile || undefined, fileContent || undefined);
       }
 
       setMaterialForm({ name: "", category: "Listening", subCategory: "Listening", mockTestId: "" });
       setFileContent(null);
       setSelectedFile(null);
       setFileName("");
-      setMockTestFiles({ Listening: null, Reading: null, Writing: null });
+      setMockTestFiles({ Listening: null, Reading: null, Writing: null, Speaking: null });
       if (fileInputRef.current) fileInputRef.current.value = "";
       setError("");
       setSuccess("Material uploaded successfully!");
@@ -441,7 +452,7 @@ export default function AdminPanel() {
                       <p className="text-sm text-blue-600 dark:text-blue-400 mb-4">Quickly import materials from your previous website (wisdom2.netlify.app).</p>
                       
                       <div className="flex flex-wrap gap-3 mb-4">
-                        {(["Reading", "Listening", "Writing", "Speaking"] as const).map((cat) => (
+                        {(["Reading", "Listening", "Writing", "Speaking", "Mock Test"] as const).map((cat) => (
                           <Button
                             key={cat}
                             variant="outline"
@@ -493,6 +504,36 @@ export default function AdminPanel() {
                                     {title:"IELTS with Jurabek - Speaking Part 2", url:"/speaking/part2.html", isPremium: false},
                                     {title:"Premium Speaking 1", url:"/speaking/premium/part1.html", isPremium: true}
                                   ];
+                                } else if (cat === "Mock Test") {
+                                  const mockSuites = [
+                                    { id: "Mock Test 1", listening: "/listening/test1.html", reading: "/reading/IELTSwithJurabek Reading.html", writing: "/writing/task1.html", speaking: "/speaking/part1.html" },
+                                    { id: "Mock Test 2", listening: "/listening/test2.html", reading: "/reading/IELTSwithJurabek.html", writing: "/writing/task2.html", speaking: "/speaking/part2.html" },
+                                    { id: "Mock Test 3", listening: "/listening/premium/test1.html", reading: "/reading/premiumreading/IELTSwithJurabek FULL Reading 1.html", writing: "/writing/premium/task1.html", speaking: "/speaking/premium/part1.html" }
+                                  ];
+                                  
+                                  for (const suite of mockSuites) {
+                                    const sections = [
+                                      { sub: "Listening", url: suite.listening },
+                                      { sub: "Reading", url: suite.reading },
+                                      { sub: "Writing", url: suite.writing },
+                                      { sub: "Speaking", url: suite.speaking }
+                                    ] as const;
+                                    
+                                    for (const section of sections) {
+                                      await addDoc(collection(db, "materials"), {
+                                        name: `${suite.id} - ${section.sub}`,
+                                        category: "Mock Tests",
+                                        subCategory: section.sub,
+                                        mockTestId: suite.id,
+                                        type: "text/html",
+                                        content: "https://wisdom2.netlify.app" + section.url.replace(/ /g, "%20"),
+                                        timestamp: Date.now(),
+                                        isPremium: true
+                                      });
+                                    }
+                                  }
+                                  setSuccess(`Successfully imported ${mockSuites.length} Mock Test suites!`);
+                                  return;
                                 }
 
                                 for (const mat of materialsToImport) {
@@ -565,6 +606,20 @@ export default function AdminPanel() {
                         </div>
                       )}
 
+                      {materialForm.category === "Mock Tests" && (
+                        <div className="space-y-2">
+                          <label className="text-sm font-medium">Mock Test Name</label>
+                          <input 
+                            required
+                            type="text" 
+                            value={materialForm.name}
+                            onChange={(e) => setMaterialForm({...materialForm, name: e.target.value, mockTestId: e.target.value})}
+                            className="w-full px-4 py-3 rounded-xl bg-slate-100 dark:bg-slate-800 border-none focus:ring-2 focus:ring-blue-500 transition-all"
+                            placeholder="e.g. Mock Test 1"
+                          />
+                        </div>
+                      )}
+
                       {materialForm.category !== "Books" && materialForm.category !== "Vocabulary" && materialForm.category !== "Mock Tests" && (
                         <div className="space-y-2">
                           <label className="text-sm font-medium">Material Name</label>
@@ -583,7 +638,7 @@ export default function AdminPanel() {
                         <div className="md:col-span-2 space-y-4">
                           <label className="text-sm font-medium">Mock Test Files (Select for each section)</label>
                           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            {(["Listening", "Reading", "Writing"] as const).map((section) => (
+                            {(["Listening", "Reading", "Writing", "Speaking"] as const).map((section) => (
                               <div key={section} className="space-y-2">
                                 <p className="text-xs font-bold text-slate-500 uppercase">{section}</p>
                                 <div 
@@ -610,19 +665,31 @@ export default function AdminPanel() {
                           </div>
                         </div>
                       ) : (
-                        <div className="md:col-span-2 space-y-2">
-                          <label className="text-sm font-medium">File (HTML preferred for auto-rendering)</label>
-                          <div 
-                            onClick={() => fileInputRef.current?.click()}
-                            className="w-full h-32 border-2 border-dashed border-slate-200 dark:border-slate-800 rounded-2xl flex flex-col items-center justify-center cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-900 transition-all"
-                          >
-                            <Upload className="h-8 w-8 text-slate-400 mb-2" />
-                            <p className="text-sm text-slate-500">{selectedFile ? `Selected: ${fileName}` : "Click to select file"}</p>
-                            <input 
-                              ref={fileInputRef}
-                              type="file" 
-                              className="hidden" 
-                              onChange={handleFileChange}
+                        <div className="md:col-span-2 space-y-4">
+                          <div className="space-y-2">
+                            <label className="text-sm font-medium">File (HTML preferred for auto-rendering)</label>
+                            <div 
+                              onClick={() => fileInputRef.current?.click()}
+                              className="w-full h-32 border-2 border-dashed border-slate-200 dark:border-slate-800 rounded-2xl flex flex-col items-center justify-center cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-900 transition-all"
+                            >
+                              <Upload className="h-8 w-8 text-slate-400 mb-2" />
+                              <p className="text-sm text-slate-500">{selectedFile ? `Selected: ${fileName}` : "Click to select file"}</p>
+                              <input 
+                                ref={fileInputRef}
+                                type="file" 
+                                className="hidden" 
+                                onChange={handleFileChange}
+                              />
+                            </div>
+                          </div>
+                          
+                          <div className="space-y-2">
+                            <label className="text-sm font-medium">Or Paste HTML Content Directly</label>
+                            <textarea 
+                              value={fileContent || ""}
+                              onChange={(e) => setFileContent(e.target.value)}
+                              className="w-full px-4 py-3 rounded-xl bg-slate-100 dark:bg-slate-800 border-none focus:ring-2 focus:ring-blue-500 transition-all min-h-[200px]"
+                              placeholder="Paste HTML content here..."
                             />
                           </div>
                         </div>
@@ -631,7 +698,7 @@ export default function AdminPanel() {
                       <div className="md:col-span-2">
                         <Button 
                           type="submit" 
-                          disabled={isUploading || (materialForm.category === "Mock Tests" ? !Object.values(mockTestFiles).some(f => f !== null) : !selectedFile)} 
+                          disabled={isUploading || (materialForm.category === "Mock Tests" ? !Object.values(mockTestFiles).some(f => f !== null) : (!selectedFile && !fileContent))} 
                           className="w-full h-12 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold disabled:opacity-50"
                         >
                           {isUploading ? (

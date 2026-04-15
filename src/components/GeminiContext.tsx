@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from "react";
-import { GoogleGenAI } from "@google/genai";
+import { GoogleGenAI, ThinkingLevel } from "@google/genai";
 import { 
   ref, 
   uploadBytes, 
@@ -109,14 +109,14 @@ interface GeminiContextType {
   rejectRequest: (requestId: string, username: string) => void;
   allRequests: PremiumRequest[];
   materials: Material[];
-  addMaterial: (material: Omit<Material, "id" | "timestamp">, file?: File) => Promise<void>;
+  addMaterial: (material: Omit<Material, "id" | "timestamp">, file?: File, contentString?: string) => Promise<void>;
   deleteMaterial: (id: string) => void;
   results: UserResult[];
   submitResult: (result: Omit<UserResult, "id" | "timestamp" | "userId" | "userName">) => void;
   transcriptions: Transcription[];
   submitTranscription: (transcription: Omit<Transcription, "id" | "timestamp" | "userId">) => Promise<void>;
-  generateAIResponse: (prompt: string, systemInstruction?: string) => Promise<string>;
-  generateAIResponseStream: (prompt: string, systemInstruction?: string) => Promise<AsyncIterable<any>>;
+  generateAIResponse: (prompt: string, systemInstruction?: string, thinkingLevel?: ThinkingLevel) => Promise<string>;
+  generateAIResponseStream: (prompt: string, systemInstruction?: string, thinkingLevel?: ThinkingLevel) => Promise<AsyncIterable<any>>;
   analyzeSpeaking: (audioBase64: string, mimeType: string) => Promise<string>;
   transcribeAudio: (audioBase64: string, mimeType: string) => Promise<string>;
   setMockTestAccess: (enabled: boolean) => Promise<void>;
@@ -203,6 +203,12 @@ export function GeminiProvider({ children }: { children: React.ReactNode }) {
     let unsubscribeUser: (() => void) | null = null;
 
     const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
+      // Reset states immediately on auth change to prevent race conditions
+      setRole("user");
+      setPremiumStatus("none");
+      setIsBlocked(false);
+      setIsGeminiEnabled(false);
+      
       setUser(currentUser);
       
       if (unsubscribeUser) {
@@ -289,13 +295,20 @@ export function GeminiProvider({ children }: { children: React.ReactNode }) {
 
   // Global settings listener
   useEffect(() => {
+    if (!user) {
+      setIsMockTestEnabled(false);
+      return;
+    }
+    
     const unsubscribeSettings = onSnapshot(doc(db, "settings", "global"), (docSnap) => {
       if (docSnap.exists()) {
         setIsMockTestEnabled(docSnap.data().mockTestAccessEnabled);
       }
+    }, (error) => {
+      console.warn("Settings listener error (expected if not logged in):", error.message);
     });
     return () => unsubscribeSettings();
-  }, []);
+  }, [user]);
 
   // Real-time listeners
   useEffect(() => {
@@ -352,12 +365,17 @@ export function GeminiProvider({ children }: { children: React.ReactNode }) {
       unsubscribeUsers = onSnapshot(qUsers, (snapshot) => {
         const data = snapshot.docs.map(doc => ({ ...doc.data() } as UserProfile));
         setAllUsers(data);
+      }, (error) => {
+        console.error("Users listener error:", error);
+        // Don't throw here to avoid crashing the app for non-admins during transitions
       });
 
       const qAlerts = query(collection(db, "alerts"), orderBy("timestamp", "desc"));
       unsubscribeAlerts = onSnapshot(qAlerts, (snapshot) => {
         const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as CheatAlert));
         setCheatAlerts(data);
+      }, (error) => {
+        console.error("Alerts listener error:", error);
       });
     }
 
@@ -451,34 +469,45 @@ export function GeminiProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  const addMaterial = async (material: Omit<Material, "id" | "timestamp">, file?: File) => {
+  const addMaterial = async (material: Omit<Material, "id" | "timestamp">, file?: File, contentString?: string) => {
     let contentUrl = material.content;
 
     try {
-      if (file) {
+      if (file || contentString) {
         try {
           // Try Storage first
-          const storageRef = ref(storage, `materials/${Date.now()}_${file.name}`);
-          const snapshot = await uploadBytes(storageRef, file);
-          contentUrl = await getDownloadURL(snapshot.ref);
-          console.log("Storage upload successful:", contentUrl);
+          const fileName = file ? file.name : `manual_${Date.now()}.html`;
+          const storageRef = ref(storage, `materials/${Date.now()}_${fileName}`);
+          
+          let snapshot;
+          if (file) {
+            snapshot = await uploadBytes(storageRef, file);
+          } else if (contentString) {
+            snapshot = await uploadBytes(storageRef, new Blob([contentString], { type: 'text/html' }));
+          }
+          
+          if (snapshot) {
+            contentUrl = await getDownloadURL(snapshot.ref);
+            console.log("Storage upload successful:", contentUrl);
+          }
         } catch (storageError: any) {
           console.warn("Storage upload failed, attempting Firestore fallback:", storageError.message || storageError);
           // Fallback for small files (< 1MB - Firestore limit)
-          if (file.size < 1000000) {
+          if (file && file.size < 1000000) {
             const base64 = await new Promise<string>((resolve, reject) => {
               const reader = new FileReader();
-              // For text/html files, read as text to save space if possible, 
-              // but base64 is safer for all types in the content field
               reader.onload = () => resolve(reader.result as string);
               reader.onerror = () => reject(new Error("Failed to read file for fallback"));
               reader.readAsDataURL(file);
             });
             contentUrl = base64;
             console.log("Firestore fallback successful (Base64)");
+          } else if (contentString && contentString.length < 1000000) {
+            contentUrl = "data:text/html;base64," + btoa(contentString);
+            console.log("Firestore fallback successful (Base64)");
           } else {
-            console.error("File too large for Firestore fallback (limit ~1MB)");
-            throw new Error(`File too large (${(file.size / 1024 / 1024).toFixed(2)}MB). Max size for fallback is 1MB. Please ensure Firebase Storage is working for larger files.`);
+            console.error("Content too large for Firestore fallback (limit ~1MB)");
+            throw new Error(`Content too large. Max size for fallback is 1MB. Please ensure Firebase Storage is working for larger files.`);
           }
         }
       }
@@ -598,7 +627,7 @@ export function GeminiProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  const generateAIResponse = async (prompt: string, systemInstruction?: string) => {
+  const generateAIResponse = async (prompt: string, systemInstruction?: string, thinkingLevel?: ThinkingLevel) => {
     if (!isGeminiEnabled) {
       throw new Error("AI is not enabled. Please activate Premium Plus.");
     }
@@ -615,13 +644,14 @@ export function GeminiProvider({ children }: { children: React.ReactNode }) {
 
       const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
       const response = await ai.models.generateContent({
-        model: "gemini-2.0-flash",
+        model: thinkingLevel ? "gemini-3.1-pro-preview" : "gemini-2.0-flash",
         contents: [{ parts: [{ text: prompt }] }],
         config: {
           systemInstruction: systemInstruction || "You are a helpful and versatile AI assistant. You can help with any topic, including IELTS, general knowledge, coding, creative writing, and more. If the user asks for an image, you can describe it and provide a markdown image link using https://pollinations.ai/p/[prompt-description]?width=1024&height=1024&seed=[random-number]. Ensure the prompt description is URL-encoded.",
-          temperature: 0.7,
-          topP: 0.95,
-          topK: 40,
+          temperature: thinkingLevel ? undefined : 0.7,
+          topP: thinkingLevel ? undefined : 0.95,
+          topK: thinkingLevel ? undefined : 40,
+          thinkingConfig: thinkingLevel ? { thinkingLevel } : undefined,
         },
       });
 

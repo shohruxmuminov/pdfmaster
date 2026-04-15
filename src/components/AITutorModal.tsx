@@ -55,7 +55,8 @@ export function AITutorModal({ isOpen, onClose, initialContext }: AITutorModalPr
       const systemInstruction = `You are Gemini AI, a professional IELTS expert on the IELTS.net platform. 
       Your goal is to help students achieve Band 8+ scores. 
       Be encouraging, precise, and provide actionable feedback. 
-      If the user is practicing a specific section (${initialContext || "IELTS"}), focus your advice on that.
+      The student is currently practicing: ${initialContext || "IELTS"}. 
+      Tailor your advice specifically to this skill area. If they ask about other skills, provide brief advice but steer them back to ${initialContext || "IELTS"}.
       Keep responses concise but comprehensive. Use Markdown for formatting (bolding, lists, etc.) to make advice clear.`;
 
       // Construct a more structured history for the prompt

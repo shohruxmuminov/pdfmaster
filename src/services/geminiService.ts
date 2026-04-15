@@ -1,4 +1,4 @@
-import { GoogleGenAI, Type } from "@google/genai";
+import { GoogleGenAI, ThinkingLevel } from "@google/genai";
 
 const apiKey = process.env.GEMINI_API_KEY || "";
 const genAI = new GoogleGenAI({ apiKey });
@@ -9,10 +9,10 @@ export const geminiModels = {
   lite: "gemini-3.1-flash-lite-preview",
 };
 
-export async function analyzeContent(content: string, task: string) {
+export async function analyzeContent(content: string, task: string, thinkingLevel?: ThinkingLevel) {
   try {
     const response = await genAI.models.generateContent({
-      model: geminiModels.flash,
+      model: thinkingLevel ? geminiModels.pro : geminiModels.flash,
       contents: [
         {
           parts: [
@@ -21,9 +21,10 @@ export async function analyzeContent(content: string, task: string) {
         }
       ],
       config: {
-        temperature: 0.7,
-        topP: 0.95,
-        topK: 64,
+        temperature: thinkingLevel ? undefined : 0.7,
+        topP: thinkingLevel ? undefined : 0.95,
+        topK: thinkingLevel ? undefined : 64,
+        thinkingConfig: thinkingLevel ? { thinkingLevel } : undefined,
       }
     });
 
