@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Westfield Sports Center</title>
+    <style>body { font-family: sans-serif; padding: 20px; } .hidden { display: none; } .submit-button { padding: 12px 24px; background: #059669; color: #fff; border: none; cursor: pointer; border-radius: 4px; }</style>
+</head>
+<body>
+    <audio id="testAudio" preload="auto" hidden src="https://cdn.kiberai.uz/content/uploads/2026/01/DAY_15.mp3"></audio>
+    <div id="startScreen">
+        <h1>Westfield Sports Center</h1>
+        <button onclick="startTest()">Start Test</button>
+    </div>
+    <div id="testInterface" class="hidden">
+        <h2>SECTION 1: Questions 1-10</h2>
+        <p>1. How long is the heated pool? <input type="radio" name="q1" value="A"> 15m <input type="radio" name="q1" value="B"> 25m <input type="radio" name="q1" value="C"> 50m</p>
+        <button class="submit-button" onclick="submitTest()">Submit Test</button>
+    </div>
+    <script>
+        function startTest() { document.getElementById('startScreen').classList.add('hidden'); document.getElementById('testInterface').classList.remove('hidden'); document.getElementById('testAudio').play(); }
+        function submitTest() { if (window.parent !== window) { window.parent.postMessage({ type: 'PRACTICE_TEST_RESULT', result: { section: 'listening', score: 20, total: 40, band: 5.5 } }, '*'); } }
+    </script>
+</body>
+</html>

@@ -37,6 +37,8 @@ import {
   Star
 } from "lucide-react";
 
+import { BlobIframe } from "../components/BlobIframe";
+
 export default function IELTSSection() {
   const { category } = useParams<{ category: string }>();
   const { isPremiumPlus, materials, submitResult, isMockTestEnabled, isBlocked, sendCheatAlert, user, role } = useGemini();
@@ -349,10 +351,6 @@ export default function IELTSSection() {
     return Object.entries(counts).map(([name, count]) => ({ name, count }));
   }, [sectionMaterials, category]);
 
-  if (!isPremiumPlus) {
-    return <Navigate to="/" />;
-  }
-
   if (category?.toLowerCase() === "speaking") {
     return <SpeakingPracticeHub />;
   }
@@ -395,6 +393,11 @@ export default function IELTSSection() {
   };
 
   const handleMaterialClick = (material: any) => {
+    if (material.isPremium && !isPremiumPlus && role !== "admin" && role !== "teacher") {
+      alert("This is a premium test. Please upgrade to Premium to access it.");
+      return;
+    }
+    
     setSelectedMaterial(material);
     setIsSubmitted(false);
     setResultForm({ 
@@ -661,10 +664,13 @@ export default function IELTSSection() {
                                 </div>
                                 <div className="flex items-center gap-2 text-xs opacity-90">
                                   <FileText className="h-3 w-3" />
-                                  Practice Set
+                                  {material.name}
                                 </div>
                               </div>
                               <div className="p-6 flex-1 flex flex-col">
+                                <h3 className="text-lg font-bold text-slate-900 dark:text-white mb-4 line-clamp-2">
+                                  {material.name}
+                                </h3>
                                 <div className="aspect-video bg-slate-100 dark:bg-slate-800 rounded-xl mb-6 flex items-center justify-center overflow-hidden">
                                   <FileText className="h-12 w-12 text-slate-300" />
                                 </div>
@@ -686,9 +692,13 @@ export default function IELTSSection() {
                                 </div>
                                 <Button 
                                   onClick={() => handleMaterialClick(material)}
-                                  className="w-full h-11 rounded-xl bg-red-600 hover:bg-red-700 text-white font-bold mt-auto"
+                                  className={`w-full h-11 rounded-xl ${(material as any).isPremium && !isPremiumPlus && role !== "admin" && role !== "teacher" ? "bg-slate-300 dark:bg-slate-700 cursor-not-allowed text-white" : "bg-red-600 hover:bg-red-700 text-white"} font-bold mt-auto`}
                                 >
-                                  <Play className="h-4 w-4 mr-2 fill-current" />
+                                  {(material as any).isPremium && !isPremiumPlus && role !== "admin" && role !== "teacher" ? (
+                                    <Lock className="h-4 w-4 mr-2 fill-current" />
+                                  ) : (
+                                    <Play className="h-4 w-4 mr-2 fill-current" />
+                                  )}
                                   Start Practice
                                 </Button>
                               </div>
@@ -729,26 +739,64 @@ export default function IELTSSection() {
                                 </div>
                               </div>
 
-                              <Button 
-                                onClick={() => {
-                                  if (category?.toLowerCase() === "books") {
-                                    handleDownload(material);
-                                  } else if (category?.toLowerCase() === "mock-tests") {
-                                    setActiveMockTest((material as any).components);
-                                    setMockTestIndex(0);
-                                    handleMaterialClick((material as any).components[0]);
-                                  } else {
-                                    handleMaterialClick(material);
+                              <div className="flex gap-2">
+                                <Button 
+                                  onClick={() => {
+                                    if ((material as any).isPremium && !isPremiumPlus && role !== "admin" && role !== "teacher") {
+                                      alert("This is a premium test. Please upgrade to Premium to access it.");
+                                      return;
+                                    }
+                                    if (category?.toLowerCase() === "books") {
+                                      handleDownload(material);
+                                    } else if (category?.toLowerCase() === "mock-tests") {
+                                      setActiveMockTest((material as any).components);
+                                      setMockTestIndex(0);
+                                      handleMaterialClick((material as any).components[0]);
+                                    } else {
+                                      handleMaterialClick(material);
+                                    }
+                                  }}
+                                  className={`flex-1 h-11 rounded-xl ${(material as any).isPremium && !isPremiumPlus && role !== "admin" && role !== "teacher" ? "bg-slate-300 dark:bg-slate-700 cursor-not-allowed" : sectionConfig.buttonColor} text-white font-bold flex items-center justify-center gap-2 shadow-lg shadow-blue-500/10`}
+                                >
+                                  {category?.toLowerCase() === "books" ? (
+                                    <><Download className="h-4 w-4" /> Download Book</>
+                                  ) : (
+                                    <>
+                                      {(material as any).isPremium && !isPremiumPlus && role !== "admin" && role !== "teacher" ? (
+                                        <Lock className="h-4 w-4 fill-current" />
+                                      ) : (
+                                        <Play className="h-4 w-4 fill-current" />
+                                      )} 
+                                      {category?.toLowerCase() === "mock-tests" ? "Start Full Test" : "Start Test"}
+                                    </>
+                                  )}
+                                </Button>
+                                {(() => {
+                                  if (category?.toLowerCase() === "books") return null;
+                                  if (category?.toLowerCase() === "mock-tests") return null;
+                                  
+                                  const mat = material as any;
+                                  const content = mat.content || "";
+                                  const isHtml = (mat.type || "").includes("html") || 
+                                    (mat.name || "").toLowerCase().endsWith(".html") || 
+                                    content.trim().startsWith("<") || 
+                                    content.startsWith("raw:") || 
+                                    content.startsWith("data:text/html");
+                                    
+                                  if (!isHtml) {
+                                    return (
+                                      <Button 
+                                        onClick={() => handleDownload(material)}
+                                        variant="outline"
+                                        className="h-11 w-11 rounded-xl shrink-0 text-slate-600 dark:text-slate-400 border-slate-200 dark:border-slate-800 hover:bg-slate-100 dark:hover:bg-slate-800"
+                                      >
+                                        <Download className="h-4 w-4" />
+                                      </Button>
+                                    );
                                   }
-                                }}
-                                className={`w-full h-11 rounded-xl ${sectionConfig.buttonColor} text-white font-bold flex items-center justify-center gap-2 shadow-lg shadow-blue-500/10`}
-                              >
-                                {category?.toLowerCase() === "books" ? (
-                                  <><Download className="h-4 w-4" /> Download Book</>
-                                ) : (
-                                  <><Play className="h-4 w-4 fill-current" /> {category?.toLowerCase() === "mock-tests" ? "Start Full Test" : "Start Test"}</>
-                                )}
-                              </Button>
+                                  return null;
+                                })()}
+                              </div>
                             </div>
                           )}
                         </motion.div>
@@ -814,7 +862,13 @@ export default function IELTSSection() {
                     }
                   }} 
                 />
-              ) : category?.toLowerCase() === "reading" && !isSubmitted ? (
+              ) : (category?.toLowerCase() === "reading" && !isSubmitted && 
+                   !(selectedMaterial?.type || "").includes("html") && 
+                   !selectedMaterial?.name?.toLowerCase().endsWith(".html") && 
+                   !selectedMaterial?.content?.trim().startsWith("<") &&
+                   !selectedMaterial?.content?.startsWith("raw:") &&
+                   !selectedMaterial?.content?.startsWith("data:text/html")
+                 ) ? (
                 <ReadingPractice passage={readingPassage} onSubmit={handleReadingSubmit} />
               ) : (
                 <>
@@ -847,7 +901,7 @@ export default function IELTSSection() {
                         {category?.toLowerCase() === "books" || category?.toLowerCase() === "vocabulary" || category?.toLowerCase() === "mock-tests" ? "Study Mode" : formatTime(timeLeft)}
                       </div>
                       
-                      {!isFullscreen && (
+                      {!isFullscreen ? (
                         <div className="hidden md:flex items-center gap-2">
                           <Button 
                             variant="secondary" 
@@ -866,6 +920,15 @@ export default function IELTSSection() {
                             <Maximize2 className="h-4 w-4" />
                           </Button>
                         </div>
+                      ) : (
+                        <Button 
+                          variant="secondary" 
+                          size="sm" 
+                          onClick={toggleFullscreen}
+                          className="rounded-xl bg-red-500 hover:bg-red-600 border-none text-white font-black text-xs h-10 px-4"
+                        >
+                          Finish & Submit
+                        </Button>
                       )}
                     </div>
                   </div>
@@ -882,29 +945,40 @@ export default function IELTSSection() {
                     </motion.div>
                   </div>
 
-                  <div className="relative flex-1 min-h-0">
-                    {selectedMaterial.type.includes("html") ? (
-                      <iframe 
-                        src={selectedMaterial.content.startsWith('http') ? selectedMaterial.content : undefined}
-                        srcDoc={selectedMaterial.content.startsWith('http') ? undefined : selectedMaterial.content} 
-                        className="w-full h-full border-none bg-white"
-                        title={selectedMaterial.name}
-                        tabIndex={-1}
-                      />
-                    ) : (
-                      <div className="flex flex-col items-center justify-center p-12 text-center h-full">
-                        <FileText className={`h-20 w-20 ${sectionConfig.textColor} mb-6`} />
-                        <h3 className="text-2xl font-bold mb-4">File Material</h3>
-                        <p className="text-slate-500 mb-8 max-w-md">This is a downloadable material. Click the button below to view or download it.</p>
-                        <Button asChild size="lg" className={`${sectionConfig.buttonColor} text-white rounded-xl px-8`}>
-                          <a href={selectedMaterial.content} download={selectedMaterial.name}>Download File</a>
-                        </Button>
-                      </div>
-                    )}
+                  <div className="relative flex-1 min-h-0 bg-white">
+                    {(() => {
+                      const mat = selectedMaterial as any;
+                      const content = mat.content || "";
+                      const isHtmlContent = (mat.type || "").includes("html") || 
+                        (mat.name || "").toLowerCase().endsWith(".html") || 
+                        content.trim().startsWith("<") || 
+                        content.startsWith("raw:") || 
+                        content.startsWith("data:text/html");
+                        
+                      if (isHtmlContent) {
+                        return (
+                          <BlobIframe 
+                            content={content}
+                            className="w-full h-full border-none bg-white"
+                            title={selectedMaterial.name}
+                          />
+                        );
+                      }
+                      return (
+                        <div className="flex flex-col items-center justify-center p-12 text-center h-full">
+                          <FileText className={`h-20 w-20 ${sectionConfig.textColor} mb-6`} />
+                          <h3 className="text-2xl font-bold mb-4">File Material</h3>
+                          <p className="text-slate-500 mb-8 max-w-md">This is a downloadable material. Click the button below to view or download it.</p>
+                          <Button asChild size="lg" className={`${sectionConfig.buttonColor} text-white rounded-xl px-8`}>
+                            <a href={selectedMaterial.content} download={selectedMaterial.name}>Download File</a>
+                          </Button>
+                        </div>
+                      );
+                    })()}
                   </div>
 
-                  {/* Submission Form - Always show when a material is selected */}
-                  {selectedMaterial && (
+                  {/* Submission Form - Hide in fullscreen to maximize reading area */}
+                  {!isFullscreen && selectedMaterial && (
                     <div className="p-8 bg-slate-50 dark:bg-slate-900/50 border-t border-slate-200 dark:border-slate-800 shrink-0">
                       <div className="max-w-2xl mx-auto">
                         <div className="text-center mb-8">
@@ -1027,151 +1101,6 @@ export default function IELTSSection() {
                     </div>
                   )}
                 </>
-              )}
-
-              <div className="relative flex-1 min-h-0">
-                {selectedMaterial.type.includes("html") ? (
-                  <iframe 
-                    src={selectedMaterial.content.startsWith('http') ? selectedMaterial.content : undefined}
-                    srcDoc={selectedMaterial.content.startsWith('http') ? undefined : selectedMaterial.content} 
-                    className="w-full h-full border-none bg-white"
-                    title={selectedMaterial.name}
-                    tabIndex={-1}
-                  />
-                ) : (
-                  <div className="flex flex-col items-center justify-center p-12 text-center h-full">
-                    <FileText className={`h-20 w-20 ${sectionConfig.textColor} mb-6`} />
-                    <h3 className="text-2xl font-bold mb-4">File Material</h3>
-                    <p className="text-slate-500 mb-8 max-w-md">This is a downloadable material. Click the button below to view or download it.</p>
-                    <Button asChild size="lg" className={`${sectionConfig.buttonColor} text-white rounded-xl px-8`}>
-                      <a href={selectedMaterial.content} download={selectedMaterial.name}>Download File</a>
-                    </Button>
-                  </div>
-                )}
-              </div>
-
-              {/* Submission Form - Always show when a material is selected */}
-              {selectedMaterial && (
-                <div className="p-8 bg-slate-50 dark:bg-slate-900/50 border-t border-slate-200 dark:border-slate-800 shrink-0">
-                  <div className="max-w-2xl mx-auto">
-                    <div className="text-center mb-8">
-                      <h3 className="text-2xl font-bold mb-2">Submit Your Result</h3>
-                      <p className="text-slate-500">Record your score to track your progress over time.</p>
-                    </div>
-                    {isSubmitted ? (
-                      <div className="text-center py-8">
-                        <div className="w-16 h-16 bg-green-100 dark:bg-green-900/30 rounded-full flex items-center justify-center mx-auto mb-4">
-                          <CheckCircle2 className="h-8 w-8 text-green-600" />
-                        </div>
-                        <h3 className="text-xl font-bold text-slate-900 dark:text-white mb-2">Result Submitted!</h3>
-                        <p className="text-slate-500 mb-6">Your score has been recorded successfully.</p>
-                        <div className="flex items-center justify-center gap-4">
-                          <Button onClick={handleBack} variant="outline" className="rounded-xl">Back to Materials</Button>
-                          {activeMockTest && mockTestIndex < activeMockTest.length - 1 && (
-                            <Button 
-                              onClick={() => {
-                                const nextIndex = mockTestIndex + 1;
-                                setMockTestIndex(nextIndex);
-                                setSelectedMaterial(activeMockTest[nextIndex]);
-                                setIsSubmitted(false);
-                                setResultForm({ firstName: "", lastName: "", telegramUsername: "", score: "", component: "Listening", content: "" });
-                                setTimeLeft(3600);
-                              }} 
-                              className="rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold"
-                            >
-                              Next Section: {activeMockTest[mockTestIndex + 1].subCategory}
-                            </Button>
-                          )}
-                        </div>
-                      </div>
-                    ) : (
-                      <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        <div className="space-y-2">
-                          <label className="text-sm font-medium text-slate-700 dark:text-slate-300">First Name</label>
-                          <input 
-                            required
-                            type="text" 
-                            value={resultForm.firstName}
-                            onChange={(e) => setResultForm({...resultForm, firstName: e.target.value})}
-                            className="w-full px-4 py-3 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-800 focus:ring-2 focus:ring-blue-500 outline-none"
-                            placeholder="John"
-                          />
-                        </div>
-                        <div className="space-y-2">
-                          <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Last Name</label>
-                          <input 
-                            required
-                            type="text" 
-                            value={resultForm.lastName}
-                            onChange={(e) => setResultForm({...resultForm, lastName: e.target.value})}
-                            className="w-full px-4 py-3 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-800 focus:ring-2 focus:ring-blue-500 outline-none"
-                            placeholder="Doe"
-                          />
-                        </div>
-                        <div className="space-y-2">
-                          <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Telegram Username</label>
-                          <input 
-                            required
-                            type="text" 
-                            value={resultForm.telegramUsername}
-                            onChange={(e) => setResultForm({...resultForm, telegramUsername: e.target.value})}
-                            className="w-full px-4 py-3 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-800 focus:ring-2 focus:ring-blue-500 outline-none"
-                            placeholder="@username"
-                          />
-                        </div>
-                        <div className="space-y-2">
-                          <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Test Component</label>
-                          <select 
-                            value={resultForm.component}
-                            onChange={(e) => setResultForm({...resultForm, component: e.target.value as any})}
-                            className="w-full px-4 py-3 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-800 focus:ring-2 focus:ring-blue-500 outline-none"
-                          >
-                            <option value="Listening">Listening</option>
-                            <option value="Reading">Reading</option>
-                            <option value="Writing">Writing</option>
-                            <option value="Speaking">Speaking</option>
-                          </select>
-                        </div>
-                        <div className="space-y-2">
-                          <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Your Score</label>
-                          <input 
-                            required
-                            type="text" 
-                            value={resultForm.score}
-                            onChange={(e) => setResultForm({...resultForm, score: e.target.value})}
-                            className="w-full px-4 py-3 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-800 focus:ring-2 focus:ring-blue-500 outline-none"
-                            placeholder="e.g. 7.5"
-                          />
-                        </div>
-                        {resultForm.component === "Writing" && (
-                          <div className="md:col-span-2 space-y-2">
-                            <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Writing Essay</label>
-                            <textarea 
-                              required
-                              value={resultForm.content}
-                              onChange={(e) => setResultForm({...resultForm, content: e.target.value})}
-                              className="w-full px-4 py-3 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-800 focus:ring-2 focus:ring-blue-500 outline-none min-h-[300px]"
-                              placeholder="Paste your essay here..."
-                            />
-                          </div>
-                        )}
-                        <div className="md:col-span-2 pt-4 flex gap-4">
-                          <Button type="submit" className={`flex-1 h-12 rounded-xl ${sectionConfig.buttonColor} text-white text-lg font-bold shadow-lg`}>
-                            <Send className="h-5 w-5 mr-2" /> Submit Result
-                          </Button>
-                          {activeMockTest && (
-                            <Button type="button" onClick={() => {
-                              // Logic to submit all mock test sections
-                              alert("Submit All functionality is being implemented.");
-                            }} className="flex-1 h-12 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-lg font-bold shadow-lg">
-                              <Send className="h-5 w-5 mr-2" /> Submit All
-                            </Button>
-                          )}
-                        </div>
-                      </form>
-                    )}
-                  </div>
-                </div>
               )}
             </div>
           </motion.div>

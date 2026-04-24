@@ -2,9 +2,10 @@ import React, { useState, useRef, useEffect, useMemo } from "react";
 import { useGemini } from "@/src/components/GeminiContext";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/src/components/ui/card";
 import { Button } from "@/src/components/ui/button";
-import { Shield, Check, X, Clock, User, Lock, AlertCircle, Plus, Trash2, FileText, Upload, Eye, List, LogIn, Loader2, Download } from "lucide-react";
+import { Shield, Check, X, Clock, User, Lock, AlertCircle, Plus, Trash2, FileText, Upload, Eye, List, LogIn, Loader2, Download, Star } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useNavigate } from "react-router-dom";
+import { INITIAL_MATERIALS } from "@/src/constants/initialMaterials";
 
 export default function AdminPanel() {
   const { 
@@ -16,6 +17,7 @@ export default function AdminPanel() {
     materials, 
     addMaterial, 
     deleteMaterial, 
+    clearMaterialsExceptSpeaking,
     results, 
     transcriptions, 
     premiumStatus, 
@@ -37,12 +39,16 @@ export default function AdminPanel() {
     }
   }, [role]);
 
+  // Approval State
+  const [expiryDays, setExpiryDays] = useState("30");
+
   // Material Form State
   const [materialForm, setMaterialForm] = useState({ 
     name: "", 
     category: "Listening" as any,
     subCategory: "Listening" as any,
-    mockTestId: ""
+    mockTestId: "",
+    isPremium: false
   });
 
   // Calculate next mock test number
@@ -83,9 +89,6 @@ export default function AdminPanel() {
   });
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Approval State
-  const [expiryDays, setExpiryDays] = useState("30");
-
   const handleLogin = async () => {
     if (adminCode === "2424") {
       setError("");
@@ -108,15 +111,19 @@ export default function AdminPanel() {
     const file = e.target.files?.[0];
     if (!file) return;
 
+    const isHtmlExt = file.name.toLowerCase().endsWith('.html') || file.name.toLowerCase().endsWith('.htm');
+    const computedType = isHtmlExt ? "text/html" : (file.type || "application/octet-stream");
+
     setSelectedFile(file);
-    setFileType(file.type);
+    setFileType(computedType);
     setFileName(file.name);
+    
     const reader = new FileReader();
     reader.onload = (event) => {
       setFileContent(event.target?.result as string);
     };
 
-    if (file.type.includes("html") || file.type.includes("text")) {
+    if (computedType.includes("html") || computedType.includes("text")) {
       reader.readAsText(file);
     } else {
       reader.readAsDataURL(file);
@@ -140,20 +147,21 @@ export default function AdminPanel() {
         }
 
         const mockName = materialForm.name || `Mock Test ${nextMockNumber}`;
-        const uploadPromises = selectedSections.map(async (section) => {
+        for (const section of selectedSections) {
           const file = mockTestFiles[section];
           if (file) {
-            return addMaterial({
+            const isHtmlExt = file.name.toLowerCase().endsWith('.html') || file.name.toLowerCase().endsWith('.htm');
+            await addMaterial({
               name: `${mockName} - ${section}`,
               category: "Mock Tests",
               subCategory: section,
               mockTestId: mockName,
-              type: file.type,
+              type: isHtmlExt ? "text/html" : (file.type || "text/html"),
+              isPremium: materialForm.isPremium,
               content: ""
             }, file);
           }
-        });
-        await Promise.all(uploadPromises);
+        }
       } else {
         if (!selectedFile && !fileContent) {
           setError("Please select a file or paste HTML content first.");
@@ -165,14 +173,14 @@ export default function AdminPanel() {
         await addMaterial({
           name: isAutoName ? (fileName || "Manual Material") : materialForm.name,
           category: materialForm.category,
-          subCategory: (materialForm.category === "Books") ? materialForm.subCategory : undefined,
-          mockTestId: undefined,
+          ...(materialForm.category === "Books" ? { subCategory: materialForm.subCategory } : {}),
           type: fileType || "text/html",
+          isPremium: materialForm.isPremium,
           content: ""
         }, selectedFile || undefined, fileContent || undefined);
       }
 
-      setMaterialForm({ name: "", category: "Listening", subCategory: "Listening", mockTestId: "" });
+      setMaterialForm({ name: "", category: "Listening", subCategory: "Listening", mockTestId: "", isPremium: false });
       setFileContent(null);
       setSelectedFile(null);
       setFileName("");
@@ -195,6 +203,7 @@ export default function AdminPanel() {
       setIsUploading(false);
     }
   };
+
 
   if (!user) {
     return (
@@ -299,6 +308,7 @@ export default function AdminPanel() {
                   {isMockTestEnabled ? "Disable Access" : "Enable Access"}
                 </Button>
               </div>
+
             </CardContent>
           </Card>
         </div>
@@ -441,282 +451,228 @@ export default function AdminPanel() {
                 exit={{ opacity: 0, y: -10 }}
                 className="space-y-8"
               >
-                <Card className="rounded-3xl border-slate-200 dark:border-slate-800 overflow-hidden">
-                  <CardHeader className="bg-slate-50 dark:bg-slate-900/50 p-8 border-b border-slate-200 dark:border-slate-800">
-                    <CardTitle className="text-2xl">Upload New Material</CardTitle>
-                    <CardDescription>Add HTML or other files to IELTS sections.</CardDescription>
-                  </CardHeader>
-                  <CardContent className="p-8">
-                    <div className="mb-8 p-6 bg-blue-50 dark:bg-blue-900/20 rounded-2xl border border-blue-100 dark:border-blue-900/30">
-                      <h3 className="text-lg font-bold text-blue-800 dark:text-blue-300 mb-2">Import from Wisdom2</h3>
-                      <p className="text-sm text-blue-600 dark:text-blue-400 mb-4">Quickly import materials from your previous website (wisdom2.netlify.app).</p>
-                      
-                      <div className="flex flex-wrap gap-3 mb-4">
-                        {(["Reading", "Listening", "Writing", "Speaking", "Mock Test"] as const).map((cat) => (
-                          <Button
-                            key={cat}
-                            variant="outline"
-                            size="sm"
-                            onClick={async () => {
-                              try {
-                                setError("");
-                                setSuccess(`Importing ${cat} materials...`);
-                                const { collection, addDoc } = await import("firebase/firestore");
-                                const { db } = await import("../firebase");
-                                
-                                let materialsToImport: {title: string, url: string, isPremium: boolean}[] = [];
-
-                                if (cat === "Reading") {
-                                  materialsToImport = [
-                                    {title:"IELTS with Jurabek - Reading Test 1", url:"/reading/IELTSwithJurabek Reading.html", isPremium: false},
-                                    {title:"IELTS with Jurabek - Reading Test 2", url:"/reading/IELTSwithJurabek.html", isPremium: false},
-                                    {title:"CDI Full Reading", url:"/reading/CDI Full reading.html", isPremium: false},
-                                    {title:"CDI Reading", url:"/reading/CDI Reading.html", isPremium: false},
-                                    {title:"Premium Full Reading 1", url:"/reading/premiumreading/IELTSwithJurabek FULL Reading 1.html", isPremium: true},
-                                    {title:"Premium Full Reading 2", url:"/reading/premiumreading/IELTSwithJurabek Reading full 2.html", isPremium: true},
-                                    {title:"Premium Full Reading 3", url:"/reading/premiumreading/IELTSwithJurabek Full reading 3.html", isPremium: true},
-                                    {title:"Premium Full Reading 4", url:"/reading/premiumreading/IELTSwithJurabek Full reading 4.html", isPremium: true},
-                                    {title:"Premium Full Reading 5", url:"/reading/premiumreading/IELTSwithJurabek full reading 5.html", isPremium: true},
-                                    {title:"Premium Full Reading 6", url:"/reading/premiumreading/IELTSwithJurabek FULL Reading 6.html", isPremium: true},
-                                    {title:"Premium Full Reading 7", url:"/reading/premiumreading/IELTSwithJurabek Reading full 7.html", isPremium: true},
-                                    {title:"Premium Full Reading 8", url:"/reading/premiumreading/Full reading 8.html", isPremium: true},
-                                    {title:"Premium Full Reading 9 (3 Passages)", url:"/reading/premiumreading/Full Reading 12.html", isPremium: true},
-                                    {title:"Premium Full Reading 10", url:"/reading/premiumreading/Full reading 10.html", isPremium: true},
-                                    {title:"Premium Full Reading 11", url:"/reading/premiumreading/IELTSwithJurabek FULL Reading 11.html", isPremium: true},
-                                    {title:"Premium Full Reading 12", url:"/reading/premiumreading/Full Reading 12.html", isPremium: true}
-                                  ];
-                                } else if (cat === "Listening") {
-                                  materialsToImport = [
-                                    {title:"IELTS with Jurabek - Listening Test 1", url:"/listening/test1.html", isPremium: false},
-                                    {title:"IELTS with Jurabek - Listening Test 2", url:"/listening/test2.html", isPremium: false},
-                                    {title:"Premium Listening 1", url:"/listening/premium/test1.html", isPremium: true},
-                                    {title:"Premium Listening 2", url:"/listening/premium/test2.html", isPremium: true}
-                                  ];
-                                } else if (cat === "Writing") {
-                                  materialsToImport = [
-                                    {title:"IELTS with Jurabek - Writing Task 1", url:"/writing/task1.html", isPremium: false},
-                                    {title:"IELTS with Jurabek - Writing Task 2", url:"/writing/task2.html", isPremium: false},
-                                    {title:"Premium Writing 1", url:"/writing/premium/task1.html", isPremium: true}
-                                  ];
-                                } else if (cat === "Speaking") {
-                                  materialsToImport = [
-                                    {title:"IELTS with Jurabek - Speaking Part 1", url:"/speaking/part1.html", isPremium: false},
-                                    {title:"IELTS with Jurabek - Speaking Part 2", url:"/speaking/part2.html", isPremium: false},
-                                    {title:"Premium Speaking 1", url:"/speaking/premium/part1.html", isPremium: true}
-                                  ];
-                                } else if (cat === "Mock Test") {
-                                  const mockSuites = [
-                                    { id: "Mock Test 1", listening: "/listening/test1.html", reading: "/reading/IELTSwithJurabek Reading.html", writing: "/writing/task1.html", speaking: "/speaking/part1.html" },
-                                    { id: "Mock Test 2", listening: "/listening/test2.html", reading: "/reading/IELTSwithJurabek.html", writing: "/writing/task2.html", speaking: "/speaking/part2.html" },
-                                    { id: "Mock Test 3", listening: "/listening/premium/test1.html", reading: "/reading/premiumreading/IELTSwithJurabek FULL Reading 1.html", writing: "/writing/premium/task1.html", speaking: "/speaking/premium/part1.html" }
-                                  ];
-                                  
-                                  for (const suite of mockSuites) {
-                                    const sections = [
-                                      { sub: "Listening", url: suite.listening },
-                                      { sub: "Reading", url: suite.reading },
-                                      { sub: "Writing", url: suite.writing },
-                                      { sub: "Speaking", url: suite.speaking }
-                                    ] as const;
-                                    
-                                    for (const section of sections) {
-                                      await addDoc(collection(db, "materials"), {
-                                        name: `${suite.id} - ${section.sub}`,
-                                        category: "Mock Tests",
-                                        subCategory: section.sub,
-                                        mockTestId: suite.id,
-                                        type: "text/html",
-                                        content: "https://wisdom2.netlify.app" + section.url.replace(/ /g, "%20"),
-                                        timestamp: Date.now(),
-                                        isPremium: true
-                                      });
-                                    }
-                                  }
-                                  setSuccess(`Successfully imported ${mockSuites.length} Mock Test suites!`);
-                                  return;
-                                }
-
-                                for (const mat of materialsToImport) {
-                                  await addDoc(collection(db, "materials"), {
-                                    name: mat.title,
-                                    category: cat,
-                                    subCategory: cat,
-                                    type: "text/html",
-                                    content: "https://wisdom2.netlify.app" + mat.url.replace(/ /g, "%20"),
-                                    timestamp: Date.now(),
-                                    isPremium: mat.isPremium
-                                  });
-                                }
-                                setSuccess(`Successfully imported ${materialsToImport.length} ${cat} materials!`);
-                              } catch (err: any) {
-                                setError("Import failed: " + err.message);
-                              }
-                            }}
-                            className="rounded-xl border-blue-200 text-blue-600 hover:bg-blue-50"
-                          >
-                            Import {cat}
-                          </Button>
-                        ))}
-                      </div>
+                <div className="space-y-6">
+                  <div className="flex items-center justify-between">
+                    <h2 className="text-2xl font-bold">Upload New Material</h2>
+                    <div className="flex items-center gap-2 px-4 py-2 bg-amber-50 dark:bg-amber-900/10 rounded-xl border border-amber-100 dark:border-amber-900/20">
+                      <Star className={`h-4 w-4 ${materialForm.isPremium ? 'text-amber-500' : 'text-slate-400'}`} />
+                      <span className="text-xs font-bold text-amber-700 dark:text-amber-400">Premium Mode:</span>
+                      <button 
+                        onClick={() => setMaterialForm(prev => ({ ...prev, isPremium: !prev.isPremium }))}
+                        className={`w-12 h-6 rounded-full transition-colors relative ${materialForm.isPremium ? 'bg-amber-500' : 'bg-slate-300'}`}
+                      >
+                        <div className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-all ${materialForm.isPremium ? 'left-7' : 'left-1'}`} />
+                      </button>
                     </div>
+                  </div>
 
-                    {error && (
-                      <div className="mb-6 flex items-center gap-2 text-red-600 dark:text-red-400 text-sm bg-red-50 dark:bg-red-900/20 p-4 rounded-xl border border-red-100 dark:border-red-900/30">
-                        <AlertCircle className="h-5 w-5 shrink-0" />
-                        <p className="font-medium">{error}</p>
-                      </div>
-                    )}
-                    {success && (
-                      <div className="mb-6 flex items-center gap-2 text-green-600 dark:text-green-400 text-sm bg-green-50 dark:bg-green-900/20 p-4 rounded-xl border border-green-100 dark:border-green-900/30">
-                        <Check className="h-5 w-5 shrink-0" />
-                        <p className="font-medium">{success}</p>
-                      </div>
-                    )}
-                    <form onSubmit={handleAddMaterial} className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <form onSubmit={handleAddMaterial} className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-[2rem] p-8 shadow-sm space-y-6">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                       <div className="space-y-2">
-                        <label className="text-sm font-medium">Category</label>
+                        <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Category</label>
                         <select 
                           value={materialForm.category}
-                          onChange={(e) => setMaterialForm({...materialForm, category: e.target.value as any})}
-                          className="w-full px-4 py-3 rounded-xl bg-slate-100 dark:bg-slate-800 border-none focus:ring-2 focus:ring-blue-500 transition-all"
+                          onChange={(e) => setMaterialForm({ ...materialForm, category: e.target.value as any })}
+                          className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900 outline-none focus:ring-2 focus:ring-blue-500"
                         >
                           <option value="Listening">Listening</option>
                           <option value="Reading">Reading</option>
                           <option value="Writing">Writing</option>
                           <option value="Speaking">Speaking</option>
-                          <option value="Books">My Premium Books</option>
-                          <option value="Vocabulary">Premium Vocabulary</option>
-                          <option value="Mock Tests">Full Mock Tests</option>
+                          <option value="Books">Books</option>
+                          <option value="Vocabulary">Vocabulary</option>
+                          <option value="Mock Tests">Mock Tests</option>
                         </select>
                       </div>
 
                       {materialForm.category === "Books" && (
                         <div className="space-y-2">
-                          <label className="text-sm font-medium">Sub-category</label>
+                          <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Sub-Category</label>
                           <select 
                             value={materialForm.subCategory}
-                            onChange={(e) => setMaterialForm({...materialForm, subCategory: e.target.value as any})}
-                            className="w-full px-4 py-3 rounded-xl bg-slate-100 dark:bg-slate-800 border-none focus:ring-2 focus:ring-blue-500 transition-all"
+                            onChange={(e) => setMaterialForm({ ...materialForm, subCategory: e.target.value as any })}
+                            className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900 outline-none focus:ring-2 focus:ring-blue-500"
                           >
-                            <option value="Listening">Listening</option>
-                            <option value="Reading">Reading</option>
-                            <option value="Writing">Writing</option>
-                            <option value="Speaking">Speaking</option>
+                            <option value="Listening">Listening Books</option>
+                            <option value="Reading">Reading Books</option>
+                            <option value="Writing">Writing Books</option>
+                            <option value="Speaking">Speaking Books</option>
+                            <option value="Full Course">Full Course Books</option>
                           </select>
                         </div>
                       )}
 
-                      {materialForm.category === "Mock Tests" && (
+                      {materialForm.category !== "Books" && materialForm.category !== "Vocabulary" && (
                         <div className="space-y-2">
-                          <label className="text-sm font-medium">Mock Test Name</label>
+                          <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Test Name</label>
                           <input 
-                            required
                             type="text" 
+                            placeholder={materialForm.category === "Mock Tests" ? `Mock Test ${nextMockNumber}` : "e.g. Cambridge 18 Test 1"}
                             value={materialForm.name}
-                            onChange={(e) => setMaterialForm({...materialForm, name: e.target.value, mockTestId: e.target.value})}
-                            className="w-full px-4 py-3 rounded-xl bg-slate-100 dark:bg-slate-800 border-none focus:ring-2 focus:ring-blue-500 transition-all"
-                            placeholder="e.g. Mock Test 1"
+                            onChange={(e) => setMaterialForm({ ...materialForm, name: e.target.value })}
+                            className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900 outline-none focus:ring-2 focus:ring-blue-500"
                           />
                         </div>
                       )}
+                    </div>
 
-                      {materialForm.category !== "Books" && materialForm.category !== "Vocabulary" && materialForm.category !== "Mock Tests" && (
-                        <div className="space-y-2">
-                          <label className="text-sm font-medium">Material Name</label>
-                          <input 
-                            required
-                            type="text" 
-                            value={materialForm.name}
-                            onChange={(e) => setMaterialForm({...materialForm, name: e.target.value})}
-                            className="w-full px-4 py-3 rounded-xl bg-slate-100 dark:bg-slate-800 border-none focus:ring-2 focus:ring-blue-500 transition-all"
-                            placeholder="e.g. Cambridge 18 Test 1"
-                          />
-                        </div>
-                      )}
-
-                      {materialForm.category === "Mock Tests" ? (
-                        <div className="md:col-span-2 space-y-4">
-                          <label className="text-sm font-medium">Mock Test Files (Select for each section)</label>
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            {(["Listening", "Reading", "Writing", "Speaking"] as const).map((section) => (
-                              <div key={section} className="space-y-2">
-                                <p className="text-xs font-bold text-slate-500 uppercase">{section}</p>
-                                <div 
-                                  onClick={() => {
-                                    const input = document.createElement("input");
-                                    input.type = "file";
-                                    input.onchange = (e: any) => {
-                                      const file = e.target.files?.[0];
-                                      if (file) {
-                                        setMockTestFiles(prev => ({ ...prev, [section]: file }));
-                                      }
-                                    };
-                                    input.click();
-                                  }}
-                                  className="w-full p-4 border-2 border-dashed border-slate-200 dark:border-slate-800 rounded-xl flex items-center gap-3 cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-900 transition-all"
-                                >
-                                  <Upload className="h-4 w-4 text-slate-400" />
-                                  <span className="text-sm truncate">
-                                    {mockTestFiles[section] ? mockTestFiles[section]?.name : `Select ${section} file`}
-                                  </span>
-                                </div>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      ) : (
-                        <div className="md:col-span-2 space-y-4">
-                          <div className="space-y-2">
-                            <label className="text-sm font-medium">File (HTML preferred for auto-rendering)</label>
-                            <div 
-                              onClick={() => fileInputRef.current?.click()}
-                              className="w-full h-32 border-2 border-dashed border-slate-200 dark:border-slate-800 rounded-2xl flex flex-col items-center justify-center cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-900 transition-all"
-                            >
-                              <Upload className="h-8 w-8 text-slate-400 mb-2" />
-                              <p className="text-sm text-slate-500">{selectedFile ? `Selected: ${fileName}` : "Click to select file"}</p>
+                    {materialForm.category === "Mock Tests" ? (
+                      <div className="space-y-4 pt-4 border-t border-slate-100 dark:border-slate-800">
+                        <p className="text-sm font-bold text-slate-400 uppercase tracking-widest">Mock Test Sections</p>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          {["Listening", "Reading", "Writing", "Speaking"].map((section) => (
+                            <div key={section} className="p-4 bg-slate-50 dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-800 flex items-center justify-between">
+                              <span className="font-bold text-sm">{section}</span>
                               <input 
-                                ref={fileInputRef}
-                                type="file" 
-                                className="hidden" 
-                                onChange={handleFileChange}
+                                type="file"
+                                onChange={(e) => setMockTestFiles(prev => ({ ...prev, [section]: e.target.files?.[0] || null }))}
+                                className="text-xs text-slate-500"
                               />
                             </div>
-                          </div>
-                          
-                          <div className="space-y-2">
-                            <label className="text-sm font-medium">Or Paste HTML Content Directly</label>
-                            <textarea 
-                              value={fileContent || ""}
-                              onChange={(e) => setFileContent(e.target.value)}
-                              className="w-full px-4 py-3 rounded-xl bg-slate-100 dark:bg-slate-800 border-none focus:ring-2 focus:ring-blue-500 transition-all min-h-[200px]"
-                              placeholder="Paste HTML content here..."
-                            />
-                          </div>
+                          ))}
                         </div>
-                      )}
-
-                      <div className="md:col-span-2">
-                        <Button 
-                          type="submit" 
-                          disabled={isUploading || (materialForm.category === "Mock Tests" ? !Object.values(mockTestFiles).some(f => f !== null) : (!selectedFile && !fileContent))} 
-                          className="w-full h-12 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold disabled:opacity-50"
-                        >
-                          {isUploading ? (
-                            <>
-                              <Loader2 className="h-5 w-5 mr-2 animate-spin" />
-                              Uploading...
-                            </>
-                          ) : (
-                            <>
-                              <Plus className="h-5 w-5 mr-2" /> 
-                              {materialForm.category === "Mock Tests" ? "Upload Mock Test Suite" : "Add Material"}
-                            </>
-                          )}
-                        </Button>
                       </div>
-                    </form>
-                  </CardContent>
-                </Card>
+                    ) : (
+                      <div className="space-y-4">
+                        <label className="text-sm font-medium text-slate-700 dark:text-slate-300">File Content (HTML or Text)</label>
+                        <div 
+                          onClick={() => fileInputRef.current?.click()}
+                          className="border-2 border-dashed border-slate-200 dark:border-slate-800 rounded-3xl p-12 text-center cursor-pointer hover:border-blue-500 transition-colors bg-slate-50 dark:bg-slate-900/50"
+                        >
+                          <Upload className="h-10 w-10 text-slate-300 mx-auto mb-4" />
+                          <p className="text-sm font-bold text-slate-900 dark:text-white">{fileName || "Click to upload file"}</p>
+                          <p className="text-xs text-slate-500 mt-2">HTML, PDF, or TXT files supported</p>
+                        </div>
+                        <input 
+                          type="file" 
+                          ref={fileInputRef}
+                          onChange={handleFileChange}
+                          className="hidden" 
+                        />
+                      </div>
+                    )}
+
+                    <div className="flex gap-4 pt-4">
+                      <Button 
+                        type="submit" 
+                        disabled={isUploading}
+                        className="flex-1 h-14 rounded-2xl bg-blue-600 hover:bg-blue-700 text-white font-bold shadow-lg shadow-blue-600/20"
+                      >
+                        {isUploading ? (
+                          <><Loader2 className="h-5 w-5 mr-2 animate-spin" /> Uploading...</>
+                        ) : (
+                          <><Plus className="h-5 w-5 mr-2" /> {materialForm.isPremium ? 'Add Premium Material' : 'Add Free Material'}</>
+                        )}
+                      </Button>
+                      <Button 
+                        type="button"
+                        variant="outline"
+                        onClick={() => {
+                          setMaterialForm({ name: "", category: "Listening", subCategory: "Listening", mockTestId: "", isPremium: false });
+                          setFileContent(null);
+                          setSelectedFile(null);
+                          setFileName("");
+                          if (fileInputRef.current) fileInputRef.current.value = "";
+                        }}
+                        className="h-14 px-8 rounded-2xl border-slate-200 dark:border-slate-800 font-bold"
+                      >
+                        Clear
+                      </Button>
+                    </div>
+                  </form>
+                </div>
+
+                <div className="space-y-4">
+                  <h2 className="text-2xl font-bold">Migration Tools</h2>
+                  <p className="text-sm text-slate-500">Manual uploads are enabled. Use these tools to manage the platform materials.</p>
+                  
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="flex items-center justify-between p-6 bg-red-50 dark:bg-red-900/10 rounded-2xl border border-red-100 dark:border-red-900/20">
+                      <div className="flex items-center gap-4">
+                        <div className="w-12 h-12 rounded-xl bg-red-100 text-red-600 flex items-center justify-center">
+                          <Trash2 className="h-6 w-6" />
+                        </div>
+                        <div>
+                          <h3 className="font-bold text-slate-900 dark:text-white">Database Cleanup</h3>
+                          <p className="text-xs text-slate-500 text-red-600 font-medium italic">Remove all data except "Speaking"</p>
+                        </div>
+                      </div>
+                      <Button 
+                        onClick={async () => {
+                          if (confirm("Are you sure? This will permanently delete all tests except Speaking.")) {
+                            try {
+                              await clearMaterialsExceptSpeaking();
+                              setSuccess("Successfully cleared all materials except Speaking!");
+                            } catch (err: any) {
+                              setError("Cleanup failed: " + err.message);
+                            }
+                          }
+                        }}
+                        className="rounded-xl px-6 font-bold bg-white text-red-600 border border-red-200 hover:bg-red-50"
+                        variant="outline"
+                      >
+                        Clear Non-Speaking
+                      </Button>
+                    </div>
+
+                    <div className="flex items-center justify-between p-6 bg-blue-50 dark:bg-blue-900/10 rounded-2xl border border-blue-100 dark:border-blue-900/20">
+                      <div className="flex items-center gap-4">
+                        <div className="w-12 h-12 rounded-xl bg-blue-100 text-blue-600 flex items-center justify-center">
+                          <Upload className="h-6 w-6" />
+                        </div>
+                        <div>
+                          <h3 className="font-bold text-slate-900 dark:text-white">Load New Materials</h3>
+                          <p className="text-xs text-slate-500">Wipe and load the 4 new Listening Free tests</p>
+                        </div>
+                      </div>
+                      <Button 
+                        onClick={async () => {
+                          if (confirm("Wipe other data and load the provided HTML sets? This will set them as FREE tests for all users.")) {
+                            try {
+                              setIsUploading(true);
+                              await clearMaterialsExceptSpeaking();
+                              for (const mat of INITIAL_MATERIALS) {
+                                const response = await fetch(mat.path);
+                                if (!response.ok) throw new Error(`Failed to fetch ${mat.name}`);
+                                const html = await response.text();
+                                
+                                await addMaterial({
+                                  name: mat.name,
+                                  category: mat.category as any,
+                                  subCategory: mat.category as any,
+                                  type: "text/html",
+                                  isPremium: false,
+                                  content: ""
+                                }, undefined, html);
+                              }
+                              setSuccess("Successfully loaded FREE materials!");
+                            } catch (err: any) {
+                              setError("Batch load failed: " + err.message);
+                            } finally {
+                              setIsUploading(false);
+                            }
+                          }
+                        }}
+                        className="rounded-xl px-6 font-bold bg-blue-600 text-white hover:bg-blue-700"
+                      >
+                        Run Migration
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+
+                {error && (
+                  <div className="flex items-center gap-2 text-red-600 dark:text-red-400 text-sm bg-red-50 dark:bg-red-900/20 p-4 rounded-xl border border-red-100 dark:border-red-900/30">
+                    <AlertCircle className="h-5 w-5 shrink-0" />
+                    <p className="font-medium">{error}</p>
+                  </div>
+                )}
+                {success && (
+                  <div className="flex items-center gap-2 text-green-600 dark:text-green-400 text-sm bg-green-50 dark:bg-green-900/20 p-4 rounded-xl border border-green-100 dark:border-green-900/30">
+                    <Check className="h-5 w-5 shrink-0" />
+                    <p className="font-medium">{success}</p>
+                  </div>
+                )}
 
                 <div className="space-y-4">
                   <h2 className="text-2xl font-bold">Existing Materials</h2>
@@ -728,7 +684,18 @@ export default function AdminPanel() {
                             <FileText className="h-5 w-5 text-blue-600" />
                           </div>
                           <div>
-                            <p className="font-bold text-slate-900 dark:text-white">{material.name}</p>
+                            <div className="flex items-center gap-2">
+                              <p className="font-bold text-slate-900 dark:text-white">{material.name}</p>
+                              {material.isPremium ? (
+                                <span className="px-2 py-0.5 rounded-full bg-amber-100 text-amber-600 dark:bg-amber-900/30 dark:text-amber-400 text-[10px] font-bold uppercase tracking-wider flex items-center gap-1">
+                                  <Star className="h-2 w-2" /> Premium
+                                </span>
+                              ) : (
+                                <span className="px-2 py-0.5 rounded-full bg-green-100 text-green-600 dark:bg-green-900/30 dark:text-green-400 text-[10px] font-bold uppercase tracking-wider">
+                                  Free
+                                </span>
+                              )}
+                            </div>
                             <p className="text-xs text-slate-500">
                               {material.category} 
                               {material.subCategory && ` (${material.subCategory})`} • {new Date(material.timestamp).toLocaleDateString()}

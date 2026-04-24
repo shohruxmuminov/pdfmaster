@@ -3,6 +3,7 @@ import { Button } from "@/src/components/ui/button";
 import { Card, CardContent } from "@/src/components/ui/card";
 import { motion, AnimatePresence } from "framer-motion";
 import { Clock, CheckCircle2, AlertTriangle } from "lucide-react";
+import { BlobIframe } from "./BlobIframe";
 
 interface MockTestRunnerProps {
   testId: string;
@@ -62,9 +63,9 @@ export const MockTestRunner: React.FC<MockTestRunnerProps> = ({ testId, componen
         {!isSectionComplete ? (
           <div className="h-full flex flex-col">
             <div className="flex-1 bg-white dark:bg-slate-900">
-              {currentSection.content.startsWith('http') ? (
-                <iframe 
-                  src={currentSection.content} 
+              {currentSection.content.startsWith('http') || currentSection.content.startsWith('data:') || currentSection.content.trim().startsWith('<') || currentSection.content.startsWith('raw:') ? (
+                <BlobIframe 
+                  content={currentSection.content} 
                   className="w-full h-full border-none"
                   title={`${testId} - ${currentSection.subCategory}`}
                 />

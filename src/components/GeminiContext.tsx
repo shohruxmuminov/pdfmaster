@@ -111,6 +111,7 @@ interface GeminiContextType {
   materials: Material[];
   addMaterial: (material: Omit<Material, "id" | "timestamp">, file?: File, contentString?: string) => Promise<void>;
   deleteMaterial: (id: string) => void;
+  clearMaterialsExceptSpeaking: () => Promise<void>;
   results: UserResult[];
   submitResult: (result: Omit<UserResult, "id" | "timestamp" | "userId" | "userName">) => void;
   transcriptions: Transcription[];
@@ -474,40 +475,77 @@ export function GeminiProvider({ children }: { children: React.ReactNode }) {
 
     try {
       if (file || contentString) {
+        let size = 0;
+        if (file) {
+          size = file.size;
+        } else if (contentString) {
+          // rough estimate of string byte size
+          size = contentString.length;
+        }
+
+        const resolvedType = material.type || (file ? file.type : "text/html") || "text/html";
+        const isHtml = resolvedType.includes("html");
+
         try {
-          // Try Storage first
+          // Always try Storage first for everything. AI Studio might not have it configured,
+          // but we give it a reasonable timeout (e.g., 10 seconds for large files).
           const fileName = file ? file.name : `manual_${Date.now()}.html`;
-          const storageRef = ref(storage, `materials/${Date.now()}_${fileName}`);
+          // clean up spaces
+          const safeName = fileName.replace(/[^a-zA-Z0-9.\-_]/g, '_');
+          const storageRef = ref(storage, `materials/${Date.now()}_${safeName}`);
           
-          let snapshot;
+          let uploadPromise;
           if (file) {
-            snapshot = await uploadBytes(storageRef, file);
+            uploadPromise = uploadBytes(storageRef, file, { contentType: resolvedType });
           } else if (contentString) {
-            snapshot = await uploadBytes(storageRef, new Blob([contentString], { type: 'text/html' }));
+            uploadPromise = uploadBytes(storageRef, new Blob([contentString], { type: resolvedType }), { contentType: resolvedType });
           }
           
-          if (snapshot) {
-            contentUrl = await getDownloadURL(snapshot.ref);
+          if (uploadPromise) {
+            // Race the upload against a 10-second timeout
+            const snapshot = await Promise.race([
+              uploadPromise,
+              new Promise((_, reject) => setTimeout(() => reject(new Error("Storage upload timed out (Bucket might not be configured, or file is very large)")), 10000))
+            ]);
+            contentUrl = await getDownloadURL((snapshot as any).ref);
             console.log("Storage upload successful:", contentUrl);
           }
         } catch (storageError: any) {
           console.warn("Storage upload failed, attempting Firestore fallback:", storageError.message || storageError);
-          // Fallback for small files (< 1MB - Firestore limit)
-          if (file && file.size < 1000000) {
-            const base64 = await new Promise<string>((resolve, reject) => {
-              const reader = new FileReader();
-              reader.onload = () => resolve(reader.result as string);
-              reader.onerror = () => reject(new Error("Failed to read file for fallback"));
-              reader.readAsDataURL(file);
-            });
-            contentUrl = base64;
-            console.log("Firestore fallback successful (Base64)");
-          } else if (contentString && contentString.length < 1000000) {
-            contentUrl = "data:text/html;base64," + btoa(contentString);
-            console.log("Firestore fallback successful (Base64)");
+          
+          // Fallback to storing directly in Firestore (strict 1MB limit for document)
+          // We limit media strictly to < 950,000 bytes just to be safe.
+          const MAX_FIRESTORE_SIZE = 950000;
+          
+          if (size >= MAX_FIRESTORE_SIZE) {
+            throw new Error(`Upload failed: File is too large (${Math.round(size/1024)}KB). Maximum size without proper Firebase Storage is ~1MB.`);
+          }
+
+          if (isHtml) {
+             if (contentString && !contentString.startsWith("data:")) {
+               contentUrl = contentString;
+             } else if (file) {
+               const rawHtml = await new Promise<string>((resolve, reject) => {
+                 const reader = new FileReader();
+                 reader.onload = () => resolve(reader.result as string);
+                 reader.onerror = () => reject(new Error("Failed to read HTML file"));
+                 reader.readAsText(file);
+               });
+               contentUrl = rawHtml;
+             }
           } else {
-            console.error("Content too large for Firestore fallback (limit ~1MB)");
-            throw new Error(`Content too large. Max size for fallback is 1MB. Please ensure Firebase Storage is working for larger files.`);
+            // Non-HTML files MUST be converted to base64 Data URLs
+            if (contentString && contentString.startsWith("data:")) {
+              contentUrl = contentString;
+            } else if (file) {
+              const base64 = await new Promise<string>((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onload = () => resolve(reader.result as string);
+                reader.onerror = () => reject(new Error("Failed to read file for fallback"));
+                reader.readAsDataURL(file);
+              });
+              contentUrl = base64;
+            }
           }
         }
       }
@@ -527,6 +565,16 @@ export function GeminiProvider({ children }: { children: React.ReactNode }) {
       await deleteDoc(doc(db, "materials", id));
     } catch (error) {
       handleFirestoreError(error, OperationType.DELETE, `materials/${id}`);
+    }
+  };
+
+  const clearMaterialsExceptSpeaking = async () => {
+    try {
+      const nonSpeakingMaterials = materials.filter(m => m.category !== "Speaking");
+      const promises = nonSpeakingMaterials.map(m => deleteDoc(doc(db, "materials", m.id)));
+      await Promise.all(promises);
+    } catch (error) {
+      handleFirestoreError(error, OperationType.DELETE, "materials/batch");
     }
   };
 
@@ -837,6 +885,7 @@ export function GeminiProvider({ children }: { children: React.ReactNode }) {
       materials,
       addMaterial,
       deleteMaterial,
+      clearMaterialsExceptSpeaking,
       results,
       submitResult,
       transcriptions,

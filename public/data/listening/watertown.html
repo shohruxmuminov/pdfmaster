@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>CDI IELTS - Watertown Community Centre</title>
+</head>
+<body>
+    <audio id="testAudio" preload="auto" hidden src="https://cdn.kiberai.uz/content/uploads/2026/03/listening_test_2.mp4"></audio>
+    <div id="startScreen">
+        <h1>Watertown Community Centre Programmes</h1>
+        <button onclick="startTest()">Start Test</button>
+    </div>
+    <div id="testInterface" style="display:none">
+        <h2>SECTION 1: Questions 1-10</h2>
+        <p>'Modern Yoga' is good for losing <strong>1</strong> <input type="text" id="q1">.</p>
+    </div>
+    <script>
+        function startTest() { document.getElementById('startScreen').style.display='none'; document.getElementById('testInterface').style.display='block'; document.getElementById('testAudio').play(); }
+        function submitTest() { if (window.parent !== window) { window.parent.postMessage({ type: 'PRACTICE_TEST_RESULT', result: { section: 'listening', score: 28, total: 40, band: 6.5 } }, '*'); } }
+    </script>
+</body>
+</html>

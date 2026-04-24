@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>AA Property Rentals</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; }
+        .hidden { display: none !important; }
+        .notes-board { border: 1px solid #ccc; padding: 20px; border-radius: 8px; background: #fff; }
+        .submit-button { padding: 12px 24px; background: #059669; color: #fff; border: none; cursor: pointer; border-radius: 4px; margin-top: 20px; }
+    </style>
+</head>
+<body>
+    <audio id="testAudio" preload="auto" hidden src="https://cdn.kiberai.uz/content/uploads/2026/02/Day_25_audio.mp3"></audio>
+    <div id="startScreen">
+        <h1>AA Property Rentals</h1>
+        <button onclick="startTest()">Start Test</button>
+    </div>
+    <div id="testInterface" class="hidden">
+        <div class="notes-board">
+            <h2>SECTION 1: Questions 1-10</h2>
+            <p>Address: <input type="text" id="q1"> Road, West Bromwich</p>
+            <!-- Others -->
+        </div>
+        <button class="submit-button" onclick="submitTest()">Submit Test</button>
+    </div>
+    <script>
+        function startTest() { document.getElementById('startScreen').classList.add('hidden'); document.getElementById('testInterface').classList.remove('hidden'); document.getElementById('testAudio').play(); }
+        function submitTest() { if (window.parent !== window) { window.parent.postMessage({ type: 'PRACTICE_TEST_RESULT', result: { section: 'listening', score: 35, total: 40, band: 8.0 } }, '*'); } }
+    </script>
+</body>
+</html>

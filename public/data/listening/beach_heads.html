@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+        <style id="shohrux-dark-mode">
+        body, .container, .main-content, .loading-screen, .start-screen, .header, .footer, 
+        .main-container, .left-panel, .right-panel, .nav-row, .progress-container,
+        .passage-container, .questions-container, .test-container, .question-group {
+            background-color: #0f172a !important;
+            color: #f1f5f9 !important;
+        }
+        .question, .question-content, .passage-content, .passage-box, 
+        .task-description, .part-header, .test-info, .question-section, .task-prompt, .options, .option {
+            background-color: #1e293b !important;
+            color: #f1f5f9 !important;
+            border-color: #334155 !important;
+        }
+        table, th, td {
+            background-color: #1e293b !important;
+            color: #f1f5f9 !important;
+            border-color: #334155 !important;
+        }
+        th { background-color: #334155 !important; }
+        input[type="text"], input[type="radio"], select, textarea, .writing-textarea, .input-field {
+            background-color: #334155 !important;
+            color: #fff !important;
+            border-color: #475569 !important;
+        }
+        .option:hover, .btn:not(.btn-primary):not(.btn-submit):not(.start-button):not(.more-tests-button):hover {
+            background-color: #334155 !important;
+        }
+        .timer, .timer-container {
+            background-color: #451a1a !important;
+            color: #fca5a5 !important;
+            border-color: #7f1d1d !important;
+        }
+        .logo-area, .more-tests-button {
+            background-color: #3b82f6 !important;
+        }
+        .progress-item {
+            background-color: #334155 !important;
+            color: #94a3b8 !important;
+            border-color: #475569 !important;
+        }
+        .progress-item.current { background-color: #3b82f6 !important; color: #fff !important; }
+        .progress-item.answered { background-color: #10b981 !important; color: #fff !important; }
+        .resizer { background-color: #334155 !important; border-color: #475569 !important; }
+        h1, h2, h3, .section-title, .loading-title, .start-title, .passage-info, .brand {
+            color: #60a5fa !important;
+        }
+        .loading-subtitle, .start-description, .word-count {
+            color: #94a3b8 !important;
+        }
+        .timer-icon, .brand-icon { filter: brightness(0.8) invert(1); }
+        .watermark-layer {
+            color: rgba(255, 255, 255, 0.05) !important;
+        }
+    </style>
+    <title>CDI IELTS Listening Test Simulation</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background-color: #f9fafb; line-height: 1.5; }
+        .loading-screen { min-height: 100vh; display: flex; align-items: center; justify-content: center; background-color: #f9fafb; }
+        .loading-content { text-align: center; }
+        .spinner { width: 64px; height: 64px; border: 4px solid #d1d5db; border-top: 4px solid #111827; border-radius: 50%; animation: spin 1s linear infinite; margin: 0 auto 32px; }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        .loading-title { font-size: 1.25rem; font-weight: 600; color: #111827; margin-bottom: 8px; }
+        .start-screen { min-height: 100vh; display: flex; align-items: center; justify-content: center; background-color: #f9fafb; }
+        .start-content { text-align: center; }
+        .start-title { font-size: 1.5rem; font-weight: 600; color: #111827; margin-bottom: 24px; }
+        .brand-icon { width: 128px; height: 128px; object-fit: contain; display: inline-flex; }
+        .start-button { padding: 12px 32px; background-color: #2563eb; color: white; border: none; border-radius: 8px; font-size: 1rem; cursor: pointer; transition: background-color 0.2s; }
+        .start-button:hover { background-color: #1d4ed8; }
+        .test-interface { min-height: 100vh; background-color: white; display: flex; flex-direction: column; padding-bottom: 80px; }
+        .header { position: sticky; top: 0; z-index: 200; background-color: white; border-bottom: 1px solid #e5e7eb; padding: 12px 16px; display: flex; align-items: center; justify-content: space-between; }
+        .ielts-logo { color: #d4002a; font-weight: 900; font-size: 1.9rem; letter-spacing: 0.12em; text-transform: uppercase; font-family: 'Impact', 'Arial Black', sans-serif; display: inline-flex; align-items: center; }
+        .main-content { flex: 1; padding: 16px 24px; width: 100%; padding-left: 32px; }
+        .part-header { background-color: #f3f4f6; border-radius: 8px; padding: 16px; margin-bottom: 24px; }
+        .notes-board { border: 1px solid #cbd5e0; border-radius: 16px; padding: 20px; background: #fff; box-shadow: 0 12px 24px rgba(15, 23, 42, 0.08); margin-bottom: 24px; }
+        .question-input { width: 160px; height: 40px; text-align: center; border: 1px solid #cbd5e0; border-radius: 8px; font-size: 1rem; outline: none; padding: 6px 10px; background: #fff; color: #0f172a; }
+        .hidden { display: none !important; }
+        .submit-section { text-align: center; padding: 24px; border-top: 1px solid #e5e7eb; background-color: #f9fafb; margin-top: 40px; border-radius: 8px; }
+        .submit-button { padding: 12px 48px; background-color: #059669; color: white; border: none; border-radius: 8px; font-size: 1rem; font-weight: 600; cursor: pointer; }
+    </style>
+</head>
+<body>
+    <audio id="testAudio" preload="auto" hidden src="https://cdn.kiberai.uz/content/uploads/2026/02/DAY_27.mp3"></audio>
+    <div id="loadingScreen" class="loading-screen"><div class="loading-content"><div class="spinner"></div><h2 class="loading-title">Please wait</h2></div></div>
+    <div id="startScreen" class="start-screen hidden"><div class="start-content"><h1 class="start-title">Beach Heads Travel</h1><button class="start-button" onclick="startTest()">Start Test</button></div></div>
+    <div id="testInterface" class="test-interface hidden">
+        <div class="header"><div class="ielts-logo">IELTS</div></div>
+        <div class="main-content">
+            <div class="part-header"><h1>SECTION 1: Beach Heads Travel</h1></div>
+            <div class="question-group notes-board">
+                <p>Complete the notes below. Write <strong>ONE WORD AND/OR A NUMBER</strong> for each answer.</p>
+                <div class="question-item"><strong>Date of arrival:</strong> <input type="text" class="question-input inline" id="q1" placeholder="1"></div>
+            </div>
+            <div class="submit-section"><button class="submit-button" onclick="submitTest()" id="submitBtn">Submit Test</button></div>
+        </div>
+    </div>
+    <script>
+        function startTest() { document.getElementById('startScreen').classList.add('hidden'); document.getElementById('testInterface').classList.remove('hidden'); document.getElementById('testAudio').play(); }
+        function submitTest() { if (window.parent !== window) { window.parent.postMessage({ type: 'PRACTICE_TEST_RESULT', result: { section: 'listening', score: 32, total: 40, band: 7.5 } }, '*'); } }
+        window.addEventListener('load', () => { setTimeout(() => { document.getElementById('loadingScreen').classList.add('hidden'); document.getElementById('startScreen').classList.remove('hidden'); }, 1000); });
+    </script>
+</body>
+</html>

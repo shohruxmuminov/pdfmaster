@@ -251,7 +251,7 @@ export default function Auth() {
       if (errorCode === "auth/email-already-in-use") {
         errorMessage = "This email is already registered. Please sign in instead.";
       } else if (errorCode === "auth/invalid-credential" || errorCode === "auth/user-not-found" || errorCode === "auth/wrong-password") {
-        errorMessage = "Invalid email or password. Please check your credentials. If you don't have an account, please create one first.";
+        errorMessage = "Invalid email or password. If you haven't created an account yet, please switch to 'Create Account'. If you signed up with Google/Apple, use those buttons below.";
       } else if (errorCode === "auth/invalid-email") {
         errorMessage = "The email address is badly formatted.";
       } else if (errorCode === "auth/weak-password") {
