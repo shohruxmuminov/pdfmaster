@@ -1,7 +1,6 @@
 import { Link } from "react-router-dom";
 import { useGemini } from "@/src/components/GeminiContext";
 import { Button } from "@/src/components/ui/button";
-import { GeminiActivationModal } from "@/src/components/GeminiActivationModal";
 import { ScheduleCalendar } from "@/src/components/ScheduleCalendar";
 import { useState, useEffect, useRef } from "react";
 import { 
@@ -22,6 +21,47 @@ import {
   Library
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
+
+const PremiumTimer = ({ expiryDate }: { expiryDate: number }) => {
+  const [timeLeft, setTimeLeft] = useState("");
+
+  useEffect(() => {
+    const updateTimer = () => {
+      const now = Date.now();
+      const diff = expiryDate - now;
+
+      if (diff <= 0) {
+        setTimeLeft("Expired");
+        return;
+      }
+
+      const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+      const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+      const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+      const seconds = Math.floor((diff % (1000 * 60)) / 1000);
+
+      setTimeLeft(`${days}d ${hours}h ${minutes}m ${seconds}s`);
+    };
+
+    updateTimer();
+    const interval = setInterval(updateTimer, 1000);
+    return () => clearInterval(interval);
+  }, [expiryDate]);
+
+  return (
+    <div className="bg-white/80 dark:bg-slate-900/80 backdrop-blur-xl px-8 py-5 rounded-[2.5rem] border border-blue-200 dark:border-blue-900/50 shadow-2xl flex items-center gap-6">
+      <div className="h-14 w-14 bg-gradient-to-br from-blue-600 to-violet-600 rounded-2xl flex items-center justify-center shadow-lg shadow-blue-500/20">
+        <Zap className="h-7 w-7 text-white animate-pulse" />
+      </div>
+      <div className="text-left">
+        <p className="text-[10px] font-black uppercase tracking-[0.2em] text-blue-600 dark:text-blue-400 mb-1">Premium Access Remains</p>
+        <p className="text-2xl font-black text-slate-900 dark:text-white tabular-nums tracking-tighter">
+          {timeLeft}
+        </p>
+      </div>
+    </div>
+  );
+};
 
 const ieltsSections = [
   {
@@ -110,45 +150,9 @@ const ieltsSections = [
   }
 ];
 
-function PremiumTimer({ expiryDate }: { expiryDate: number }) {
-  const [timeLeft, setTimeLeft] = useState("");
-
-  useEffect(() => {
-    const timer = setInterval(() => {
-      const now = Date.now();
-      const diff = expiryDate - now;
-
-      if (diff <= 0) {
-        setTimeLeft("Expired");
-        clearInterval(timer);
-        return;
-      }
-
-      const days = Math.floor(diff / (1000 * 60 * 60 * 24));
-      const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
-      const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
-      const seconds = Math.floor((diff % (1000 * 60)) / 1000);
-
-      setTimeLeft(`${days}d ${hours}h ${minutes}m ${seconds}s`);
-    }, 1000);
-
-    return () => clearInterval(timer);
-  }, [expiryDate]);
-
-  return (
-    <div className="flex items-center gap-3 bg-blue-600 text-white px-6 py-3 rounded-2xl shadow-xl shadow-blue-600/20 animate-pulse">
-      <Clock className="h-5 w-5" />
-      <div className="flex flex-col text-left">
-        <span className="text-[10px] uppercase font-bold tracking-widest opacity-80">Premium Access Ends In</span>
-        <span className="font-mono font-bold text-lg leading-none">{timeLeft}</span>
-      </div>
-    </div>
-  );
-}
 
 export default function Home() {
-  const { isGeminiEnabled, toggleGemini, isPremium, expiryDate } = useGemini();
-  const [isModalOpen, setIsModalOpen] = useState(false);
+  const { isGeminiEnabled, isPremium, expiryDate } = useGemini();
   const [isCalendarOpen, setIsCalendarOpen] = useState(false);
   const videoRef = useRef<HTMLVideoElement>(null);
 
@@ -160,17 +164,8 @@ export default function Home() {
     }
   }, []);
 
-  const handleToggle = () => {
-    if (!isPremium) {
-      setIsModalOpen(true);
-    } else {
-      toggleGemini(!isGeminiEnabled);
-    }
-  };
-
   return (
     <div className="flex-1 bg-slate-50 dark:bg-slate-950 overflow-hidden">
-      <GeminiActivationModal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} />
       
       <ScheduleCalendar 
         isOpen={isCalendarOpen}
@@ -248,30 +243,6 @@ export default function Home() {
                     <Calendar className="h-6 w-6" />
                     <span>Schedule Practice</span>
                   </Button>
-
-                  <div className="flex items-center gap-6 bg-white dark:bg-slate-900 p-3 rounded-[2.5rem] border border-slate-200 dark:border-slate-800 shadow-2xl">
-                    <div className="flex items-center gap-4 px-6">
-                      <div className={`w-10 h-10 rounded-full flex items-center justify-center ${isGeminiEnabled ? "bg-blue-600 text-white" : "bg-slate-100 dark:bg-slate-800 text-slate-400"}`}>
-                        <Sparkles className="h-5 w-5" />
-                      </div>
-                      <div className="text-left">
-                        <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">AI Assistant</p>
-                        <p className="text-sm font-black">{isGeminiEnabled ? "ACTIVE" : "DISABLED"}</p>
-                      </div>
-                    </div>
-                    <button
-                      onClick={handleToggle}
-                      className={`relative inline-flex h-12 w-24 items-center rounded-full transition-all focus:outline-none ${
-                        isGeminiEnabled ? "bg-blue-600" : "bg-slate-200 dark:bg-slate-800"
-                      }`}
-                    >
-                      <span
-                        className={`inline-block h-10 w-10 transform rounded-full bg-white shadow-xl transition-transform ${
-                          isGeminiEnabled ? "translate-x-13" : "translate-x-1"
-                        }`}
-                      />
-                    </button>
-                  </div>
                 </div>
               </div>
             </motion.div>

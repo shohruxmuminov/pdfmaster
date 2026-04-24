@@ -24,16 +24,6 @@ import {
   serverTimestamp
 } from "firebase/firestore";
 
-interface PremiumRequest {
-  id?: string;
-  username: string;
-  status: "pending" | "approved" | "rejected";
-  timestamp: number;
-  uid: string;
-  plan?: "Premium";
-  expiryDate?: number; // timestamp
-}
-
 interface Material {
   id: string;
   category: "Listening" | "Reading" | "Writing" | "Speaking" | "Books" | "Vocabulary" | "Mock Tests";
@@ -77,7 +67,6 @@ interface Transcription {
 interface UserProfile {
   uid: string;
   email: string;
-  premiumStatus: "none" | "pending" | "approved";
   expiryDate: number | null;
   role: "user" | "admin" | "teacher";
   isBlocked?: boolean;
@@ -100,16 +89,12 @@ interface GeminiContextType {
   loading: boolean;
   isGeminiEnabled: boolean;
   isPremium: boolean;
-  premiumStatus: "none" | "pending" | "approved";
   role: "user" | "admin" | "teacher";
   expiryDate: number | null;
   isBlocked: boolean;
   isMockTestEnabled: boolean;
   toggleGemini: (enabled: boolean) => void;
-  sendPremiumRequest: (plan: "Premium") => Promise<void>;
-  approveRequest: (requestId: string, username: string, expiryDate: number) => void;
-  rejectRequest: (requestId: string, username: string) => void;
-  allRequests: PremiumRequest[];
+  updateUserPremium: (userId: string, isPremium: boolean, expiryDays: number) => Promise<void>;
   materials: Material[];
   addMaterial: (material: Omit<Material, "id" | "timestamp">, file?: File, contentString?: string) => Promise<void>;
   deleteMaterial: (id: string) => void;
@@ -188,19 +173,17 @@ export function GeminiProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const [isGeminiEnabled, setIsGeminiEnabled] = useState(false);
-  const [premiumStatus, setPremiumStatus] = useState<"none" | "pending" | "approved">("none");
   const [role, setRole] = useState<"user" | "admin" | "teacher">("user");
   const [expiryDate, setExpiryDate] = useState<number | null>(null);
   const [isBlocked, setIsBlocked] = useState(false);
   const [isMockTestEnabled, setIsMockTestEnabled] = useState(false);
-  const [allRequests, setAllRequests] = useState<PremiumRequest[]>([]);
   const [materials, setMaterials] = useState<Material[]>([]);
   const [results, setResults] = useState<UserResult[]>([]);
   const [transcriptions, setTranscriptions] = useState<Transcription[]>([]);
   const [allUsers, setAllUsers] = useState<UserProfile[]>([]);
   const [cheatAlerts, setCheatAlerts] = useState<CheatAlert[]>([]);
 
-  const isPremium = premiumStatus === "approved";
+  const isPremium = expiryDate ? Date.now() < expiryDate : false;
 
   useEffect(() => {
     let unsubscribeUser: (() => void) | null = null;
@@ -208,7 +191,6 @@ export function GeminiProvider({ children }: { children: React.ReactNode }) {
     const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
       // Reset states immediately on auth change to prevent race conditions
       setRole("user");
-      setPremiumStatus("none");
       setIsBlocked(false);
       setIsGeminiEnabled(false);
       
@@ -238,18 +220,24 @@ export function GeminiProvider({ children }: { children: React.ReactNode }) {
         // Fetch user profile
         const userDocRef = doc(db, "users", currentUser.uid);
         
+        // Ensure user is in the database for admin to see
+        await setDoc(userDocRef, {
+          uid: currentUser.uid,
+          email: currentUser.email,
+          displayName: currentUser.displayName || currentUser.email?.split('@')[0] || "User",
+          lastActive: now
+        }, { merge: true });
+
         // Real-time listener for user profile to handle blocking and role changes
         unsubscribeUser = onSnapshot(userDocRef, (docSnap) => {
           if (docSnap.exists()) {
             const userData = docSnap.data();
-            setPremiumStatus(userData.premiumStatus || "none");
             setRole(userData.role || "user");
             setExpiryDate(userData.expiryDate || null);
             setIsBlocked(userData.isBlocked || false);
-            setIsGeminiEnabled(userData.premiumStatus === "approved");
+            setIsGeminiEnabled(userData.expiryDate ? Date.now() < userData.expiryDate : false);
           } else {
             // Default for new users
-            setPremiumStatus("none");
             setRole("user");
             setIsBlocked(false);
             setIsGeminiEnabled(false);
@@ -278,13 +266,11 @@ export function GeminiProvider({ children }: { children: React.ReactNode }) {
         }
       } else {
         setUser(null);
-        setPremiumStatus("none");
         setRole("user");
         setExpiryDate(null);
         setIsBlocked(false);
         setIsGeminiEnabled(false);
         setMaterials([]);
-        setAllRequests([]);
         setResults([]);
         setLoading(false);
       }
@@ -333,21 +319,12 @@ export function GeminiProvider({ children }: { children: React.ReactNode }) {
       handleFirestoreError(error, OperationType.GET, "materials");
     });
 
-    let unsubscribeRequests = () => {};
     let unsubscribeResults = () => {};
     let unsubscribeTranscriptions = () => {};
     let unsubscribeUsers = () => {};
     let unsubscribeAlerts = () => {};
 
     if (role === "admin" || role === "teacher") {
-      const qRequests = query(collection(db, "requests"), orderBy("timestamp", "desc"));
-      unsubscribeRequests = onSnapshot(qRequests, (snapshot) => {
-        const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as PremiumRequest));
-        setAllRequests(data);
-      }, (error) => {
-        handleFirestoreError(error, OperationType.GET, "requests");
-      });
-
       const qResults = query(collection(db, "results"), orderBy("timestamp", "desc"));
       unsubscribeResults = onSnapshot(qResults, (snapshot) => {
         const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as UserResult));
@@ -384,7 +361,6 @@ export function GeminiProvider({ children }: { children: React.ReactNode }) {
 
     return () => {
       unsubscribeMaterials();
-      unsubscribeRequests();
       unsubscribeResults();
       unsubscribeTranscriptions();
       unsubscribeUsers();
@@ -397,11 +373,9 @@ export function GeminiProvider({ children }: { children: React.ReactNode }) {
     if (isPremium && expiryDate && Date.now() > expiryDate) {
       if (user) {
         updateDoc(doc(db, "users", user.uid), {
-          premiumStatus: "none",
           expiryDate: null
         });
       }
-      setPremiumStatus("none");
       setExpiryDate(null);
       setIsGeminiEnabled(false);
     }
@@ -413,64 +387,15 @@ export function GeminiProvider({ children }: { children: React.ReactNode }) {
     }
     setIsGeminiEnabled(enabled);
   };
-
-  const sendPremiumRequest = async (plan: "Premium") => {
-    if (!user) return;
-
-    await addDoc(collection(db, "requests"), {
-      username: user.displayName || user.email || "Unknown User",
-      plan,
-      status: "pending",
-      timestamp: Date.now(),
-      uid: user.uid
-    });
-
-    await updateDoc(doc(db, "users", user.uid), {
-      premiumStatus: "pending"
-    });
+  
+  const updateUserPremium = async (userId: string, isPremium: boolean, expiryDays: number) => {
+    if (role !== "admin") return;
     
-    setPremiumStatus("pending");
-  };
-
-  const approveRequest = async (requestId: string, username: string, expiry: number) => {
-    try {
-      await updateDoc(doc(db, "requests", requestId), {
-        status: "approved",
-        expiryDate: expiry
-      });
-
-      const reqDoc = await getDoc(doc(db, "requests", requestId));
-      const uid = reqDoc.data()?.uid;
-      
-      if (uid) {
-        await updateDoc(doc(db, "users", uid), {
-          premiumStatus: "approved",
-          expiryDate: expiry
-        });
-      }
-    } catch (error) {
-      handleFirestoreError(error, OperationType.WRITE, `requests/${requestId}`);
-    }
-  };
-
-  const rejectRequest = async (requestId: string, username: string) => {
-    try {
-      await updateDoc(doc(db, "requests", requestId), {
-        status: "rejected"
-      });
-
-      const reqDoc = await getDoc(doc(db, "requests", requestId));
-      const uid = reqDoc.data()?.uid;
-      
-      if (uid) {
-        await updateDoc(doc(db, "users", uid), {
-          premiumStatus: "none",
-          expiryDate: null
-        });
-      }
-    } catch (error) {
-      handleFirestoreError(error, OperationType.WRITE, `requests/${requestId}`);
-    }
+    const expiryDate = isPremium ? Date.now() + (expiryDays * 24 * 60 * 60 * 1000) : null;
+    
+    await updateDoc(doc(db, "users", userId), {
+      expiryDate: expiryDate
+    });
   };
 
   const addMaterial = async (material: Omit<Material, "id" | "timestamp">, file?: File, contentString?: string) => {
@@ -858,7 +783,6 @@ export function GeminiProvider({ children }: { children: React.ReactNode }) {
       await setDoc(doc(db, "users", userId), {
         uid: userId,
         email: user.email,
-        premiumStatus: "approved",
         expiryDate: Date.now() + (365 * 24 * 60 * 60 * 1000), // 1 year
         role: role,
         displayName: user.displayName || (role === "admin" ? "Admin" : "Teacher"),
@@ -875,16 +799,12 @@ export function GeminiProvider({ children }: { children: React.ReactNode }) {
       loading,
       isGeminiEnabled, 
       isPremium, 
-      premiumStatus,
       role,
       expiryDate,
       isBlocked,
       isMockTestEnabled,
       toggleGemini, 
-      sendPremiumRequest,
-      approveRequest,
-      rejectRequest,
-      allRequests,
+      updateUserPremium,
       materials,
       addMaterial,
       deleteMaterial,

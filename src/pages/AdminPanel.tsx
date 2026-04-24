@@ -11,26 +11,25 @@ export default function AdminPanel() {
   const { 
     user, 
     role, 
-    allRequests, 
-    approveRequest, 
-    rejectRequest, 
     materials, 
     addMaterial, 
     deleteMaterial, 
     clearMaterialsExceptSpeaking,
     results, 
     transcriptions, 
-    premiumStatus, 
     grantPremiumStatus,
     isMockTestEnabled,
-    setMockTestAccess
+    setMockTestAccess,
+    allUsers,
+    updateUserPremium,
+    blockUser
   } = useGemini();
   const [adminCode, setAdminCode] = useState("");
   const [isCodeAuthenticated, setIsCodeAuthenticated] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
-  const [activeTab, setActiveTab] = useState<"requests" | "materials" | "results" | "transcriptions">("requests");
+  const [activeTab, setActiveTab] = useState<"materials" | "results" | "transcriptions" | "users">("users");
   const navigate = useNavigate();
 
   // Results Sorting and Filtering
@@ -361,11 +360,11 @@ export default function AdminPanel() {
           </div>
           <div className="flex items-center gap-2 p-1 bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm">
             <Button 
-              variant={activeTab === "requests" ? "default" : "ghost"} 
-              onClick={() => setActiveTab("requests")}
+              variant={activeTab === "users" ? "default" : "ghost"} 
+              onClick={() => setActiveTab("users")}
               className="rounded-xl px-6"
             >
-              Requests
+              Users
             </Button>
             <Button 
               variant={activeTab === "materials" ? "default" : "ghost"} 
@@ -393,18 +392,18 @@ export default function AdminPanel() {
 
         <div className="grid gap-8">
           <AnimatePresence mode="wait">
-            {activeTab === "requests" && (
+            {activeTab === "users" && (
               <motion.div 
-                key="requests"
+                key="users"
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -10 }}
                 className="space-y-6"
               >
                 <div className="flex items-center justify-between mb-4">
-                  <h2 className="text-2xl font-bold">Premium Requests</h2>
+                  <h2 className="text-2xl font-bold">User Management</h2>
                   <div className="flex items-center gap-2">
-                    <label className="text-sm font-medium text-slate-500">Default Expiry (Days):</label>
+                    <label className="text-sm font-medium text-slate-500">Premium Duration (Days):</label>
                     <input 
                       type="number" 
                       value={expiryDays}
@@ -414,75 +413,90 @@ export default function AdminPanel() {
                   </div>
                 </div>
 
-                {allRequests.length === 0 ? (
-                  <div className="text-center py-20 bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 border-dashed">
-                    <Clock className="h-12 w-12 text-slate-300 mx-auto mb-4" />
-                    <h3 className="text-xl font-bold text-slate-900 dark:text-white">No pending requests</h3>
-                    <p className="text-slate-500">New requests will appear here as they come in.</p>
-                  </div>
-                ) : (
-                  allRequests.sort((a, b) => b.timestamp - a.timestamp).map((request) => (
-                    <div
-                      key={request.id || request.username + request.timestamp}
-                      className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-6 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-6"
-                    >
-                      <div className="flex items-center gap-4">
-                        <div className="w-14 h-14 bg-slate-100 dark:bg-slate-800 rounded-2xl flex items-center justify-center">
-                          <User className="h-7 w-7 text-slate-500" />
-                        </div>
-                        <div>
-                          <h3 className="text-lg font-bold text-slate-900 dark:text-white">{request.username}</h3>
-                          <div className="flex items-center gap-2 text-sm text-slate-500">
-                            <Clock className="h-3 w-3" />
-                            {new Date(request.timestamp).toLocaleString()}
+                <div className="grid gap-4">
+                  {allUsers.length === 0 ? (
+                    <div className="text-center py-20 bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 border-dashed">
+                      <User className="h-12 w-12 text-slate-300 mx-auto mb-4" />
+                      <h3 className="text-xl font-bold text-slate-900 dark:text-white">No users found</h3>
+                      <p className="text-slate-500">Users will appear here once they sign up.</p>
+                    </div>
+                  ) : (
+                    allUsers.map((u) => (
+                      <div
+                        key={u.uid}
+                        className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-6 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-6"
+                      >
+                        <div className="flex items-center gap-4">
+                          <div className={`w-14 h-14 rounded-2xl flex items-center justify-center ${u.expiryDate && Date.now() < u.expiryDate ? 'bg-blue-100 dark:bg-blue-900/30 text-blue-600' : 'bg-slate-100 dark:bg-slate-800 text-slate-500'}`}>
+                            <User className="h-7 w-7" />
+                          </div>
+                          <div>
+                            <div className="flex items-center gap-2">
+                              <h3 className="text-lg font-bold text-slate-900 dark:text-white">{(u as any).displayName || u.email}</h3>
+                              {u.expiryDate && Date.now() < u.expiryDate && (
+                                <span className="px-2 py-0.5 rounded-full bg-blue-100 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400 text-[10px] font-bold uppercase tracking-wider">Premium</span>
+                              )}
+                              {u.role === "admin" && (
+                                <span className="px-2 py-0.5 rounded-full bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400 text-[10px] font-bold uppercase tracking-wider">Admin</span>
+                              )}
+                            </div>
+                            <p className="text-sm text-slate-500">{u.email}</p>
+                            {u.premiumStatus === "approved" && u.expiryDate && (
+                              <p className="text-xs text-blue-500 mt-1 flex items-center gap-1">
+                                <Clock className="h-3 w-3" />
+                                Expires: {new Date(u.expiryDate).toLocaleString()}
+                              </p>
+                            )}
                           </div>
                         </div>
-                      </div>
 
-                      <div className="flex items-center gap-4">
-                        <div className={`px-4 py-1.5 rounded-full text-xs font-bold uppercase tracking-wider ${
-                          request.status === "pending" ? "bg-amber-50 text-amber-600 dark:bg-amber-900/20 dark:text-amber-400" :
-                          request.status === "approved" ? "bg-green-50 text-green-600 dark:bg-green-900/20 dark:text-green-400" :
-                          "bg-red-50 text-red-600 dark:bg-red-900/20 dark:text-red-400"
-                        }`}>
-                          {request.status}
-                          {request.status === "approved" && request.expiryDate && (
-                            <span className="ml-2 opacity-70">
-                              (Expires: {new Date(request.expiryDate).toLocaleDateString()})
-                            </span>
+                        <div className="flex items-center gap-2">
+                          {u.premiumStatus === "approved" ? (
+                            <Button 
+                              onClick={() => updateUserPremium(u.uid, false, 0)}
+                              size="sm" 
+                              variant="outline"
+                              className="rounded-xl border-red-200 text-red-600 hover:bg-red-50 dark:border-red-900/30 dark:hover:bg-red-900/20"
+                            >
+                              <X className="h-4 w-4 mr-2" /> Revoke Premium
+                            </Button>
+                          ) : (
+                            <Button 
+                              onClick={() => updateUserPremium(u.uid, true, parseInt(expiryDays))}
+                              size="sm" 
+                              className="bg-blue-600 hover:bg-blue-700 text-white rounded-xl px-4"
+                            >
+                              <Zap className="h-4 w-4 mr-2" /> Give Premium
+                            </Button>
+                          )}
+                          
+                          <Button 
+                            onClick={() => blockUser(u.uid, !u.isBlocked)}
+                            size="sm" 
+                            variant="ghost"
+                            className={`rounded-xl ${u.isBlocked ? 'text-red-600 bg-red-50' : 'text-slate-400'}`}
+                          >
+                            <Shield className="h-4 w-4 mr-2" /> {u.isBlocked ? "Unblock" : "Block User"}
+                          </Button>
+
+                          {u.role !== "admin" && (
+                            <Button 
+                              onClick={() => grantPremiumStatus(u.uid, "admin")}
+                              size="sm" 
+                              variant="outline"
+                              className="rounded-xl border-slate-200 text-slate-600 hover:bg-slate-50"
+                            >
+                              Make Admin
+                            </Button>
                           )}
                         </div>
-
-                        {request.status === "pending" && (
-                          <div className="flex items-center gap-2">
-                            <Button 
-                              onClick={() => {
-                                if (request.id) {
-                                  const expiry = Date.now() + (parseInt(expiryDays) * 24 * 60 * 60 * 1000);
-                                  approveRequest(request.id, request.username, expiry);
-                                }
-                              }}
-                              size="sm" 
-                              className="bg-green-600 hover:bg-green-700 text-white rounded-xl px-4"
-                            >
-                              <Check className="h-4 w-4 mr-2" /> Approve
-                            </Button>
-                            <Button 
-                              onClick={() => request.id && rejectRequest(request.id, request.username)}
-                              size="sm" 
-                              variant="outline" 
-                              className="border-red-200 text-red-600 hover:bg-red-50 dark:border-red-900/30 dark:hover:bg-red-900/20 rounded-xl px-4"
-                            >
-                              <X className="h-4 w-4 mr-2" /> Reject
-                            </Button>
-                          </div>
-                        )}
                       </div>
-                    </div>
-                  ))
-                )}
+                    ))
+                  )}
+                </div>
               </motion.div>
             )}
+
 
             {activeTab === "materials" && (
               <motion.div 

@@ -394,7 +394,7 @@ export default function IELTSSection() {
 
   const handleMaterialClick = (material: any) => {
     if (material.isPremium && !isPremium) {
-      alert("This is a premium material. Please request Premium access to unlock it.");
+      alert("This is a premium material. Please contact our admin team on Telegram to unlock it.");
       return;
     }
     
