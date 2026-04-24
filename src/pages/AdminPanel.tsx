@@ -402,7 +402,7 @@ export default function AdminPanel() {
                 className="space-y-6"
               >
                 <div className="flex items-center justify-between mb-4">
-                  <h2 className="text-2xl font-bold">Premium+ Requests</h2>
+                  <h2 className="text-2xl font-bold">Premium Requests</h2>
                   <div className="flex items-center gap-2">
                     <label className="text-sm font-medium text-slate-500">Default Expiry (Days):</label>
                     <input 

@@ -29,6 +29,8 @@ interface PremiumRequest {
   username: string;
   status: "pending" | "approved" | "rejected";
   timestamp: number;
+  uid: string;
+  plan?: "Premium";
   expiryDate?: number; // timestamp
 }
 
@@ -97,14 +99,14 @@ interface GeminiContextType {
   user: User | null;
   loading: boolean;
   isGeminiEnabled: boolean;
-  isPremiumPlus: boolean;
+  isPremium: boolean;
   premiumStatus: "none" | "pending" | "approved";
   role: "user" | "admin" | "teacher";
   expiryDate: number | null;
   isBlocked: boolean;
   isMockTestEnabled: boolean;
   toggleGemini: (enabled: boolean) => void;
-  sendPremiumRequest: (username: string) => void;
+  sendPremiumRequest: (plan: "Premium") => Promise<void>;
   approveRequest: (requestId: string, username: string, expiryDate: number) => void;
   rejectRequest: (requestId: string, username: string) => void;
   allRequests: PremiumRequest[];
@@ -198,7 +200,7 @@ export function GeminiProvider({ children }: { children: React.ReactNode }) {
   const [allUsers, setAllUsers] = useState<UserProfile[]>([]);
   const [cheatAlerts, setCheatAlerts] = useState<CheatAlert[]>([]);
 
-  const isPremiumPlus = premiumStatus === "approved";
+  const isPremium = premiumStatus === "approved";
 
   useEffect(() => {
     let unsubscribeUser: (() => void) | null = null;
@@ -392,7 +394,7 @@ export function GeminiProvider({ children }: { children: React.ReactNode }) {
 
   // Check for expiry
   useEffect(() => {
-    if (isPremiumPlus && expiryDate && Date.now() > expiryDate) {
+    if (isPremium && expiryDate && Date.now() > expiryDate) {
       if (user) {
         updateDoc(doc(db, "users", user.uid), {
           premiumStatus: "none",
@@ -403,20 +405,21 @@ export function GeminiProvider({ children }: { children: React.ReactNode }) {
       setExpiryDate(null);
       setIsGeminiEnabled(false);
     }
-  }, [isPremiumPlus, expiryDate, user]);
+  }, [isPremium, expiryDate, user]);
 
   const toggleGemini = (enabled: boolean) => {
-    if (enabled && !isPremiumPlus) {
+    if (enabled && !isPremium) {
       return;
     }
     setIsGeminiEnabled(enabled);
   };
 
-  const sendPremiumRequest = async (username: string) => {
+  const sendPremiumRequest = async (plan: "Premium") => {
     if (!user) return;
 
     await addDoc(collection(db, "requests"), {
-      username,
+      username: user.displayName || user.email || "Unknown User",
+      plan,
       status: "pending",
       timestamp: Date.now(),
       uid: user.uid
@@ -871,7 +874,7 @@ export function GeminiProvider({ children }: { children: React.ReactNode }) {
       user,
       loading,
       isGeminiEnabled, 
-      isPremiumPlus, 
+      isPremium, 
       premiumStatus,
       role,
       expiryDate,

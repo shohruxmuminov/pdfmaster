@@ -30,10 +30,17 @@ export const ReadingPractice: React.FC<ReadingPracticeProps> = ({ passage, onSub
 
   useEffect(() => {
     const timer = setInterval(() => {
-      setTimeLeft((prev) => (prev > 0 ? prev - 1 : 0));
+      setTimeLeft((prev) => {
+        if (prev <= 1) {
+          clearInterval(timer);
+          if (!isSubmitted) handleSubmit();
+          return 0;
+        }
+        return prev - 1;
+      });
     }, 1000);
     return () => clearInterval(timer);
-  }, []);
+  }, [isSubmitted]);
 
   const formatTime = (seconds: number) => {
     const mins = Math.floor(seconds / 60);
@@ -100,24 +107,38 @@ export const ReadingPractice: React.FC<ReadingPracticeProps> = ({ passage, onSub
                 {qIdx + 1}. {q.text}
               </p>
               <div className="space-y-2">
-                {q.options.map((option, oIdx) => (
-                  <button
-                    key={oIdx}
-                    onClick={() => handleAnswer(q.id, oIdx)}
-                    disabled={isSubmitted}
-                    className={`w-full text-left p-3 rounded-xl border transition-all ${
-                      answers[q.id] === oIdx
-                        ? (isSubmitted 
-                            ? (oIdx === q.correctAnswer ? "bg-green-600 text-white border-green-600" : "bg-red-600 text-white border-red-600")
-                            : "bg-blue-600 text-white border-blue-600")
-                        : (isSubmitted && oIdx === q.correctAnswer 
-                            ? "bg-green-100 text-green-800 border-green-200"
-                            : "bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 hover:border-blue-300")
-                    }`}
-                  >
-                    {String.fromCharCode(65 + oIdx)}. {option}
-                  </button>
-                ))}
+                {q.options.map((option, oIdx) => {
+                  const isSelected = answers[q.id] === oIdx;
+                  const isCorrect = oIdx === q.correctAnswer;
+                  
+                  return (
+                    <button
+                      key={oIdx}
+                      onClick={() => handleAnswer(q.id, oIdx)}
+                      disabled={isSubmitted}
+                      className={`w-full text-left p-4 rounded-xl border-2 transition-all flex items-center justify-between group ${
+                        isSelected
+                          ? (isSubmitted 
+                              ? (isCorrect ? "bg-green-50 border-green-500 text-green-900" : "bg-red-50 border-red-500 text-red-900")
+                              : "bg-blue-50 border-blue-500 text-blue-900")
+                          : (isSubmitted && isCorrect 
+                              ? "bg-green-50 border-green-200 text-green-900"
+                              : "bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 hover:border-blue-200 hover:bg-slate-50")
+                      }`}
+                    >
+                      <span className="flex-1">
+                        <span className="font-bold mr-3">{String.fromCharCode(65 + oIdx)}.</span>
+                        {option}
+                      </span>
+                      {isSubmitted && (
+                        <span>
+                          {isCorrect && <Check className="h-5 w-5 text-green-600" />}
+                          {isSelected && !isCorrect && <AlertCircle className="h-5 w-5 text-red-600" />}
+                        </span>
+                      )}
+                    </button>
+                  );
+                })}
               </div>
             </div>
           ))}

@@ -147,7 +147,7 @@ function PremiumTimer({ expiryDate }: { expiryDate: number }) {
 }
 
 export default function Home() {
-  const { isGeminiEnabled, toggleGemini, isPremiumPlus, expiryDate } = useGemini();
+  const { isGeminiEnabled, toggleGemini, isPremium, expiryDate } = useGemini();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isCalendarOpen, setIsCalendarOpen] = useState(false);
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -161,7 +161,7 @@ export default function Home() {
   }, []);
 
   const handleToggle = () => {
-    if (!isPremiumPlus) {
+    if (!isPremium) {
       setIsModalOpen(true);
     } else {
       toggleGemini(!isGeminiEnabled);
@@ -227,7 +227,7 @@ export default function Home() {
               </p>
 
               <div className="flex flex-wrap items-center justify-center gap-8">
-                {isPremiumPlus && expiryDate && (
+                {isPremium && expiryDate && (
                   <motion.div
                     initial={{ scale: 0.9, opacity: 0 }}
                     animate={{ scale: 1, opacity: 1 }}

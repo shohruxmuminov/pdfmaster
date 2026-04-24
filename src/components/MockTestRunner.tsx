@@ -16,8 +16,34 @@ export const MockTestRunner: React.FC<MockTestRunnerProps> = ({ testId, componen
   const [results, setResults] = useState<Record<string, any>>({});
   const [isSectionComplete, setIsSectionComplete] = useState(false);
   const [manualScore, setManualScore] = useState("");
+  const [timeLeft, setTimeLeft] = useState(3600); // 1 hour for sections
 
   const currentSection = components[currentSectionIndex];
+
+  useEffect(() => {
+    // Reset timer when section changes
+    setTimeLeft(3600);
+  }, [currentSectionIndex]);
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setTimeLeft(prev => {
+        if (prev <= 1) {
+          clearInterval(timer);
+          // Handle timeout - maybe auto-submit?
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+    return () => clearInterval(timer);
+  }, []);
+
+  const formatTime = (seconds: number) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+  };
 
   const handleSectionSubmit = (score: number, bandScore?: string, feedback?: string) => {
     setResults(prev => ({ 
@@ -52,8 +78,11 @@ export const MockTestRunner: React.FC<MockTestRunnerProps> = ({ testId, componen
           </div>
         </div>
         <div className="flex items-center gap-6">
-          <div className="flex items-center gap-2 font-mono font-bold text-slate-600">
+          <div className={`flex items-center gap-2 px-3 py-1.5 rounded-lg font-mono font-bold transition-colors ${timeLeft < 300 ? 'bg-red-100 text-red-600 animate-pulse' : 'bg-slate-100 text-slate-600'}`}>
             <Clock className="h-4 w-4" />
+            {formatTime(timeLeft)}
+          </div>
+          <div className="flex items-center gap-2 font-mono font-bold text-slate-600">
             Section {currentSectionIndex + 1} of {components.length}
           </div>
         </div>

@@ -1,22 +1,24 @@
 import React, { useState } from "react";
-import { Check, Key, Send, Sparkles, Shield, Zap } from "lucide-react";
+import { Check, Send, Sparkles, Shield, Trophy } from "lucide-react";
 import { Button } from "@/src/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/src/components/ui/card";
-import { useUser } from "@/src/hooks/useUser";
+import { useGemini } from "@/src/components/GeminiContext";
 import { motion } from "framer-motion";
 
 export default function Pricing() {
-  const { isPremium, activatePremium } = useUser();
-  const [code, setCode] = useState("");
+  const { isPremium, premiumStatus, sendPremiumRequest } = useGemini();
   const [message, setMessage] = useState<{ type: "success" | "error", text: string } | null>(null);
+  const [loading, setLoading] = useState(false);
 
-  const handleActivate = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (activatePremium(code)) {
-      setMessage({ type: "success", text: "Premium activated successfully! All limits are removed." });
-      setCode("");
-    } else {
-      setMessage({ type: "error", text: "Invalid premium code. Please try again." });
+  const handleRequest = async () => {
+    setLoading(true);
+    try {
+      await sendPremiumRequest("Premium");
+      setMessage({ type: "success", text: "Premium request sent! Admin will review it shortly." });
+    } catch (err: any) {
+      setMessage({ type: "error", text: "Failed to send request. Please try again or contact support." });
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -125,10 +127,10 @@ export default function Pricing() {
             <CardFooter className="p-8 pt-0">
               <Button 
                 className="w-full h-12 rounded-xl text-base bg-blue-600 hover:bg-blue-700 text-white shadow-lg shadow-blue-600/20" 
-                onClick={() => document.getElementById('activation-panel')?.scrollIntoView({ behavior: 'smooth' })}
-                disabled={isPremium}
+                onClick={() => document.getElementById('request-panel')?.scrollIntoView({ behavior: 'smooth' })}
+                disabled={isPremium || premiumStatus === "pending"}
               >
-                {isPremium ? "Active Plan" : "Get Premium Code"}
+                {isPremium ? "Active Plan" : premiumStatus === "pending" ? "Request Pending" : "Get Premium Access"}
               </Button>
             </CardFooter>
           </Card>
@@ -137,7 +139,7 @@ export default function Pricing() {
 
       {/* Activation Panel */}
       <motion.div 
-        id="activation-panel" 
+        id="request-panel" 
         className="max-w-2xl mx-auto"
         initial={{ opacity: 0, scale: 0.95 }}
         whileInView={{ opacity: 1, scale: 1 }}
@@ -149,11 +151,17 @@ export default function Pricing() {
             <div className="absolute bottom-0 left-0 w-64 h-64 bg-violet-500/10 rounded-full blur-3xl translate-y-1/2 -translate-x-1/3" />
             
             <div className="w-16 h-16 bg-white/10 rounded-2xl flex items-center justify-center mx-auto mb-6 backdrop-blur-sm border border-white/10">
-              <Key className="h-8 w-8 text-blue-400" />
+              <Shield className="h-8 w-8 text-blue-400" />
             </div>
-            <h2 className="text-2xl md:text-3xl font-bold text-white mb-3">Activate Premium</h2>
+            <h2 className="text-2xl md:text-3xl font-bold text-white mb-3">
+              {premiumStatus === "pending" ? "Request Pending" : isPremium ? "Premium Active" : "Request Premium"}
+            </h2>
             <p className="text-slate-300 max-w-md mx-auto">
-              Enter your premium code below to unlock all features instantly.
+              {isPremium 
+                ? "You have full access to all materials." 
+                : premiumStatus === "pending" 
+                  ? "Your request is being reviewed by an administrator."
+                  : "Click below to request premium access from an administrator."}
             </p>
           </div>
           
@@ -164,29 +172,30 @@ export default function Pricing() {
                   <Check className="h-8 w-8 text-green-600 dark:text-green-400" />
                 </div>
                 <h3 className="text-xl font-bold text-slate-900 dark:text-white mb-2">Premium Active</h3>
-                <p className="text-slate-600 dark:text-slate-400">You currently have access to all premium features.</p>
+                <p className="text-slate-600 dark:text-slate-400 mb-8">You currently have access to all premium features.</p>
+                <Button asChild className="w-full h-12 rounded-xl bg-slate-900 hover:bg-slate-800">
+                  <a href="/">Go to Materials</a>
+                </Button>
               </div>
             ) : (
-              <form onSubmit={handleActivate} className="space-y-6">
-                <div className="space-y-2">
-                  <label htmlFor="code" className="text-sm font-medium text-slate-700 dark:text-slate-300">
-                    Premium Code
-                  </label>
-                  <div className="flex gap-3">
-                    <input
-                      id="code"
-                      type="text"
-                      placeholder="Enter code"
-                      value={code}
-                      onChange={(e) => setCode(e.target.value)}
-                      className="flex-1 px-4 py-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-950 text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-shadow text-lg"
-                      required
-                    />
-                    <Button type="submit" className="h-auto px-8 rounded-xl bg-slate-900 hover:bg-slate-800 dark:bg-blue-600 dark:hover:bg-blue-700 text-white shadow-md">
-                      Activate
-                    </Button>
+              <div className="space-y-6">
+                {premiumStatus === "pending" ? (
+                  <div className="bg-amber-50 dark:bg-amber-900/20 p-6 rounded-2xl border border-amber-200 dark:border-amber-800 flex flex-col items-center text-center">
+                    <Trophy className="h-12 w-12 text-amber-500 mb-4 animate-bounce" />
+                    <h3 className="text-xl font-bold text-amber-900 dark:text-amber-400 mb-2">Wait for Approval</h3>
+                    <p className="text-amber-700 dark:text-amber-500 text-sm">
+                      Your request has been received. Our team will review your profile shortly.
+                    </p>
                   </div>
-                </div>
+                ) : (
+                  <Button 
+                    onClick={handleRequest}
+                    disabled={loading}
+                    className="w-full h-16 rounded-2xl text-xl font-bold bg-blue-600 hover:bg-blue-700 text-white shadow-xl shadow-blue-500/20"
+                  >
+                    {loading ? "Sending..." : "Request Premium Access"}
+                  </Button>
+                )}
 
                 {message && (
                   <div className={`p-4 rounded-xl text-sm font-medium flex items-center gap-2 ${
@@ -201,10 +210,10 @@ export default function Pricing() {
 
                 <div className="pt-6 mt-6 border-t border-slate-100 dark:border-slate-800">
                   <h4 className="font-semibold text-slate-900 dark:text-white mb-4 flex items-center gap-2">
-                    <Send className="h-4 w-4 text-blue-500 dark:text-blue-400" /> Need a code?
+                    <Send className="h-4 w-4 text-blue-500 dark:text-blue-400" /> Fast Response?
                   </h4>
                   <p className="text-slate-600 dark:text-slate-400 text-sm leading-relaxed mb-4">
-                    To get a premium activation code, please contact our administrator on Telegram.
+                    For faster activation, you can also contact our administrator directly on Telegram.
                   </p>
                   <a 
                     href="https://t.me/jujutsukaisen_jap" 
@@ -212,10 +221,10 @@ export default function Pricing() {
                     rel="noopener noreferrer"
                     className="inline-flex items-center justify-center w-full px-4 py-3 bg-[#0088cc] hover:bg-[#0077b3] text-white rounded-xl font-medium transition-colors shadow-sm"
                   >
-                    <Send className="h-4 w-4 mr-2" /> Contact @jujutsukaisen_jap
+                    <Send className="h-4 w-4 mr-2" /> Message Admin on Telegram
                   </a>
                 </div>
-              </form>
+              </div>
             )}
           </CardContent>
         </Card>

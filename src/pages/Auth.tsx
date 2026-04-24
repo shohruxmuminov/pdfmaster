@@ -27,6 +27,7 @@ export default function Auth() {
   const [message, setMessage] = useState("");
   const [loading, setLoading] = useState(false);
   const [showPhoneAuth, setShowPhoneAuth] = useState(false);
+  const [isIframe, setIsIframe] = useState(false);
   const [phoneNumber, setPhoneNumber] = useState("");
   const [verificationCode, setVerificationCode] = useState("");
   const [confirmationResult, setConfirmationResult] = useState<ConfirmationResult | null>(null);
@@ -34,6 +35,10 @@ export default function Auth() {
   const [showTroubleshooting, setShowTroubleshooting] = useState(false);
   const [showSetupHelper, setShowSetupHelper] = useState(false);
   const navigate = useNavigate();
+
+  React.useEffect(() => {
+    setIsIframe(window.self !== window.top);
+  }, []);
 
   const currentDomain = window.location.hostname;
 
@@ -75,10 +80,12 @@ export default function Auth() {
       const errorCode = err.code || (err.message && err.message.match(/\((auth\/[^)]+)\)/)?.[1]);
       
       if (errorCode === "auth/unauthorized-domain") {
-        setError("This domain is not authorized in Firebase. Please add it to 'Authorized domains' in the Firebase Console.");
+        setError(`This domain (${currentDomain}) is not authorized in Firebase. Please add it to 'Authorized domains' in the Firebase Console.`);
         setShowTroubleshooting(true);
+      } else if (errorCode === "auth/popup-blocked") {
+        setError("Sign-in popup was blocked by your browser. Please allow popups for this site or open the app in a new tab.");
       } else {
-        setError("Apple sign-in failed. Please try again.");
+        setError(`Apple sign-in failed: ${err.message || 'Please try again.'}`);
       }
     } finally {
       setLoading(false);
@@ -179,11 +186,13 @@ export default function Auth() {
       const errorCode = err.code || (err.message && err.message.match(/\((auth\/[^)]+)\)/)?.[1]);
       
       if (errorCode === "auth/unauthorized-domain") {
-        setError("This domain is not authorized in Firebase. Please add it to 'Authorized domains' in the Firebase Console.");
+        setError(`This domain (${currentDomain}) is not authorized in Firebase. Please add it to 'Authorized domains' in the Firebase Console.`);
         setShowTroubleshooting(true);
       } else if (errorCode === "auth/invalid-credential") {
-        setError("Invalid credentials or unauthorized domain. If you are the developer, please ensure this domain is allowlisted in Firebase Console.");
+        setError("Sign-in failed. This usually means the domain is not allowlisted or there's a Firebase config mismatch. Click 'Troubleshoot' below.");
         setShowTroubleshooting(true);
+      } else if (errorCode === "auth/popup-blocked") {
+        setError("The sign-in popup was blocked. Please allow popups or open the app in a new tab.");
       } else if (errorCode === "auth/popup-closed-by-user") {
         setError("Sign-in popup was closed before completion. Please try again.");
       } else if (errorCode === "auth/cancelled-by-user") {
@@ -301,6 +310,24 @@ export default function Auth() {
 
           <div className="p-8">
             <div id="recaptcha-container"></div>
+            {isIframe && (
+              <div className="mb-6 p-4 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-xl text-amber-700 dark:text-amber-400 text-xs font-medium flex flex-col gap-2">
+                <p className="flex items-center gap-2">
+                  <AlertCircle className="h-4 w-4" />
+                  Running in an Iframe
+                </p>
+                <p>Authentication popups might be blocked in this preview. For the best experience, open the app in a new tab.</p>
+                <Button 
+                  onClick={() => window.open(window.location.href, '_blank')}
+                  variant="outline" 
+                  size="sm" 
+                  className="h-8 rounded-lg mt-2 border-amber-200 dark:border-amber-800 hover:bg-amber-100"
+                >
+                  Open in New Tab
+                </Button>
+              </div>
+            )}
+
             {error && (
               <div className="mb-6 p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-xl text-red-600 dark:text-red-400 text-sm font-medium flex items-center gap-3">
                 <div className="w-2 h-2 bg-red-600 rounded-full animate-ping" />

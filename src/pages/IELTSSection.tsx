@@ -41,7 +41,7 @@ import { BlobIframe } from "../components/BlobIframe";
 
 export default function IELTSSection() {
   const { category } = useParams<{ category: string }>();
-  const { isPremiumPlus, materials, submitResult, isMockTestEnabled, isBlocked, sendCheatAlert, user, role } = useGemini();
+  const { isPremium, materials, submitResult, isMockTestEnabled, isBlocked, sendCheatAlert, user, role } = useGemini();
   const [selectedMaterial, setSelectedMaterial] = useState<any>(null);
   const [activeMockTest, setActiveMockTest] = useState<any[] | null>(null);
   const [mockTestIndex, setMockTestIndex] = useState(0);
@@ -393,8 +393,8 @@ export default function IELTSSection() {
   };
 
   const handleMaterialClick = (material: any) => {
-    if (material.isPremium && !isPremiumPlus && role !== "admin" && role !== "teacher") {
-      alert("This is a premium test. Please upgrade to Premium to access it.");
+    if (material.isPremium && !isPremium) {
+      alert("This is a premium material. Please request Premium access to unlock it.");
       return;
     }
     
@@ -692,9 +692,9 @@ export default function IELTSSection() {
                                 </div>
                                 <Button 
                                   onClick={() => handleMaterialClick(material)}
-                                  className={`w-full h-11 rounded-xl ${(material as any).isPremium && !isPremiumPlus && role !== "admin" && role !== "teacher" ? "bg-slate-300 dark:bg-slate-700 cursor-not-allowed text-white" : "bg-red-600 hover:bg-red-700 text-white"} font-bold mt-auto`}
+                                  className={`w-full h-11 rounded-xl ${(material as any).isPremium && !isPremium ? "bg-slate-300 dark:bg-slate-700 cursor-not-allowed text-white" : "bg-red-600 hover:bg-red-700 text-white"} font-bold mt-auto`}
                                 >
-                                  {(material as any).isPremium && !isPremiumPlus && role !== "admin" && role !== "teacher" ? (
+                                  {(material as any).isPremium && !isPremium ? (
                                     <Lock className="h-4 w-4 mr-2 fill-current" />
                                   ) : (
                                     <Play className="h-4 w-4 mr-2 fill-current" />
@@ -742,8 +742,8 @@ export default function IELTSSection() {
                               <div className="flex gap-2">
                                 <Button 
                                   onClick={() => {
-                                    if ((material as any).isPremium && !isPremiumPlus && role !== "admin" && role !== "teacher") {
-                                      alert("This is a premium test. Please upgrade to Premium to access it.");
+                                    if ((material as any).isPremium && !isPremium) {
+                                      alert("This is a premium material. Please request Premium access to unlock it.");
                                       return;
                                     }
                                     if (category?.toLowerCase() === "books") {
@@ -756,13 +756,13 @@ export default function IELTSSection() {
                                       handleMaterialClick(material);
                                     }
                                   }}
-                                  className={`flex-1 h-11 rounded-xl ${(material as any).isPremium && !isPremiumPlus && role !== "admin" && role !== "teacher" ? "bg-slate-300 dark:bg-slate-700 cursor-not-allowed" : sectionConfig.buttonColor} text-white font-bold flex items-center justify-center gap-2 shadow-lg shadow-blue-500/10`}
+                                  className={`flex-1 h-11 rounded-xl ${(material as any).isPremium && !isPremium ? "bg-slate-300 dark:bg-slate-700 cursor-not-allowed" : sectionConfig.buttonColor} text-white font-bold flex items-center justify-center gap-2 shadow-lg shadow-blue-500/10`}
                                 >
                                   {category?.toLowerCase() === "books" ? (
                                     <><Download className="h-4 w-4" /> Download Book</>
                                   ) : (
                                     <>
-                                      {(material as any).isPremium && !isPremiumPlus && role !== "admin" && role !== "teacher" ? (
+                                      {(material as any).isPremium && !isPremium ? (
                                         <Lock className="h-4 w-4 fill-current" />
                                       ) : (
                                         <Play className="h-4 w-4 fill-current" />
@@ -862,8 +862,18 @@ export default function IELTSSection() {
                     }
                   }} 
                 />
-              ) : (category?.toLowerCase() === "reading" && !isSubmitted && !selectedMaterial ) ? (
-                <ReadingPractice passage={readingPassage} onSubmit={handleReadingSubmit} />
+              ) : (selectedMaterial && category?.toLowerCase() === "reading" && !isSubmitted && 
+                   !(selectedMaterial?.type || "").includes("html") && 
+                   !selectedMaterial?.name?.toLowerCase().endsWith(".html") && 
+                   !selectedMaterial?.content?.trim().startsWith("<") &&
+                   !selectedMaterial?.content?.startsWith("raw:") &&
+                   !selectedMaterial?.content?.startsWith("data:text/html")
+                 ) ? (
+                <div className="flex-1 overflow-auto p-4 md:p-8">
+                  <div className="max-w-7xl mx-auto">
+                    <ReadingPractice passage={readingPassage} onSubmit={handleReadingSubmit} />
+                  </div>
+                </div>
               ) : (
                 <>
                   {/* Header - Show a simplified version in fullscreen or normal mode if test is active */}
@@ -892,7 +902,7 @@ export default function IELTSSection() {
                     <div className="flex items-center gap-3">
                       <div className={`flex items-center gap-2 px-4 py-2 rounded-xl font-mono font-black text-lg md:text-xl backdrop-blur-md border ${timeLeft < 300 ? 'bg-red-500/30 text-white border-red-400 animate-pulse' : 'bg-white/10 text-white border-white/10'}`}>
                         <Clock className="h-5 w-5" />
-                        {category?.toLowerCase() === "books" || category?.toLowerCase() === "vocabulary" || category?.toLowerCase() === "mock-tests" ? "Study Mode" : formatTime(timeLeft)}
+                        {category?.toLowerCase() === "books" || category?.toLowerCase() === "vocabulary" ? "Study Mode" : formatTime(timeLeft)}
                       </div>
                       
                       {!isFullscreen ? (
