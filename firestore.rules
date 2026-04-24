@@ -86,14 +86,14 @@ service cloud.firestore {
     }
 
     function hasOnlyAllowedFields(fields) {
-      return request.resource.data.keys().hasOnly(fields);
+      return fields.hasAll(request.resource.data.keys());
     }
 
     // ===============================================================
     // Domain Validators
     // ===============================================================
     function isValidUser(data, userId) {
-      return hasOnlyAllowedFields(['uid', 'email', 'premiumStatus', 'expiryDate', 'role', 'displayName', 'createdAt', 'isBlocked']) &&
+      return hasOnlyAllowedFields(['uid', 'email', 'premiumStatus', 'expiryDate', 'role', 'displayName', 'createdAt', 'isBlocked', 'photoUrl']) &&
              data.uid == userId &&
              isValidEmail(data.email) &&
              data.premiumStatus in ['none', 'pending', 'approved'] &&

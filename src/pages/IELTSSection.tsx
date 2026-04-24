@@ -862,13 +862,7 @@ export default function IELTSSection() {
                     }
                   }} 
                 />
-              ) : (category?.toLowerCase() === "reading" && !isSubmitted && 
-                   !(selectedMaterial?.type || "").includes("html") && 
-                   !selectedMaterial?.name?.toLowerCase().endsWith(".html") && 
-                   !selectedMaterial?.content?.trim().startsWith("<") &&
-                   !selectedMaterial?.content?.startsWith("raw:") &&
-                   !selectedMaterial?.content?.startsWith("data:text/html")
-                 ) ? (
+              ) : (category?.toLowerCase() === "reading" && !isSubmitted && !selectedMaterial ) ? (
                 <ReadingPractice passage={readingPassage} onSubmit={handleReadingSubmit} />
               ) : (
                 <>
@@ -949,11 +943,20 @@ export default function IELTSSection() {
                     {(() => {
                       const mat = selectedMaterial as any;
                       const content = mat.content || "";
-                      const isHtmlContent = (mat.type || "").includes("html") || 
-                        (mat.name || "").toLowerCase().endsWith(".html") || 
+                      const type = (mat.type || "").toLowerCase();
+                      const name = (mat.name || "").toLowerCase();
+                      
+                      const isHtmlContent = type.includes("html") || 
+                        type.includes("text") ||
+                        type.includes("pdf") ||
+                        name.endsWith(".html") || 
+                        name.endsWith(".htm") ||
+                        name.endsWith(".txt") ||
+                        name.endsWith(".pdf") ||
                         content.trim().startsWith("<") || 
                         content.startsWith("raw:") || 
-                        content.startsWith("data:text/html");
+                        content.startsWith("data:text/html") ||
+                        (content.startsWith("http") && (category?.toLowerCase() === "reading" || category?.toLowerCase() === "listening"));
                         
                       if (isHtmlContent) {
                         return (
@@ -968,10 +971,15 @@ export default function IELTSSection() {
                         <div className="flex flex-col items-center justify-center p-12 text-center h-full">
                           <FileText className={`h-20 w-20 ${sectionConfig.textColor} mb-6`} />
                           <h3 className="text-2xl font-bold mb-4">File Material</h3>
-                          <p className="text-slate-500 mb-8 max-w-md">This is a downloadable material. Click the button below to view or download it.</p>
-                          <Button asChild size="lg" className={`${sectionConfig.buttonColor} text-white rounded-xl px-8`}>
-                            <a href={selectedMaterial.content} download={selectedMaterial.name}>Download File</a>
-                          </Button>
+                          <p className="text-slate-500 mb-8 max-w-md">This material is ready for download or viewing.</p>
+                          <div className="flex gap-4">
+                            <Button asChild size="lg" className={`${sectionConfig.buttonColor} text-white rounded-xl px-8`}>
+                              <a href={selectedMaterial.content} target="_blank" rel="noopener noreferrer">View File</a>
+                            </Button>
+                            <Button asChild size="lg" variant="outline" className="rounded-xl px-8">
+                              <a href={selectedMaterial.content} download={selectedMaterial.name}>Download</a>
+                            </Button>
+                          </div>
                         </div>
                       );
                     })()}

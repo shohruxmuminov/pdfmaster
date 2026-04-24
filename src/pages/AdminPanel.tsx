@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect, useMemo } from "react";
 import { useGemini } from "@/src/components/GeminiContext";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/src/components/ui/card";
 import { Button } from "@/src/components/ui/button";
-import { Shield, Check, X, Clock, User, Lock, AlertCircle, Plus, Trash2, FileText, Upload, Eye, List, LogIn, Loader2, Download, Star } from "lucide-react";
+import { Shield, Check, X, Clock, User, Lock, AlertCircle, Plus, Trash2, FileText, Upload, Eye, List, LogIn, Loader2, Download, Star, Search, ArrowUpDown, ChevronDown } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useNavigate } from "react-router-dom";
 import { INITIAL_MATERIALS } from "@/src/constants/initialMaterials";
@@ -32,6 +32,47 @@ export default function AdminPanel() {
   const [success, setSuccess] = useState("");
   const [activeTab, setActiveTab] = useState<"requests" | "materials" | "results" | "transcriptions">("requests");
   const navigate = useNavigate();
+
+  // Results Sorting and Filtering
+  const [resultSearch, setResultSearch] = useState("");
+  const [resultSortField, setResultSortField] = useState("timestamp");
+  const [resultSortOrder, setResultSortOrder] = useState<"asc" | "desc">("desc");
+
+  const sortedAndFilteredResults = useMemo(() => {
+    return results
+      .map(res => ({
+        ...res,
+        studentName: `${res.firstName} ${res.lastName}`.trim() || res.userName || "Unknown Student"
+      }))
+      .filter(res => 
+        res.studentName.toLowerCase().includes(resultSearch.toLowerCase()) ||
+        (res.telegramUsername || "").toLowerCase().includes(resultSearch.toLowerCase()) ||
+        res.materialName.toLowerCase().includes(resultSearch.toLowerCase()) ||
+        res.component.toLowerCase().includes(resultSearch.toLowerCase())
+      )
+      .sort((a: any, b: any) => {
+        let valA = a[resultSortField];
+        let valB = b[resultSortField];
+
+        if (typeof valA === 'string') {
+          valA = valA.toLowerCase();
+          valB = valB.toLowerCase();
+        }
+
+        if (valA < valB) return resultSortOrder === "asc" ? -1 : 1;
+        if (valA > valB) return resultSortOrder === "asc" ? 1 : -1;
+        return 0;
+      });
+  }, [results, resultSearch, resultSortField, resultSortOrder]);
+
+  const toggleSort = (field: string) => {
+    if (resultSortField === field) {
+      setResultSortOrder(resultSortOrder === "asc" ? "desc" : "asc");
+    } else {
+      setResultSortField(field);
+      setResultSortOrder("desc");
+    }
+  };
   
   useEffect(() => {
     if (role === "admin") {
@@ -725,64 +766,119 @@ export default function AdminPanel() {
                 exit={{ opacity: 0, y: -10 }}
                 className="space-y-6"
               >
-                <h2 className="text-2xl font-bold">User Results</h2>
+                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                  <h2 className="text-2xl font-bold flex items-center gap-2">
+                    <Star className="h-6 w-6 text-blue-500" />
+                    IELTS Test Results
+                  </h2>
+                  <div className="relative w-full md:w-80">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+                    <input 
+                      type="text" 
+                      placeholder="Search students, tests..." 
+                      value={resultSearch}
+                      onChange={(e) => setResultSearch(e.target.value)}
+                      className="w-full h-10 pl-10 pr-4 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 focus:ring-2 focus:ring-blue-500 outline-none text-sm shadow-sm"
+                    />
+                  </div>
+                </div>
+
                 <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl overflow-hidden shadow-sm">
-                  <table className="w-full text-left border-collapse">
-                    <thead>
-                      <tr className="bg-slate-50 dark:bg-slate-800/50 border-b border-slate-200 dark:border-slate-800">
-                        <th className="p-4 font-bold text-sm text-slate-600 dark:text-slate-400">User</th>
-                        <th className="p-4 font-bold text-sm text-slate-600 dark:text-slate-400">Username</th>
-                        <th className="p-4 font-bold text-sm text-slate-600 dark:text-slate-400">Telegram</th>
-                        <th className="p-4 font-bold text-sm text-slate-600 dark:text-slate-400">Material</th>
-                        <th className="p-4 font-bold text-sm text-slate-600 dark:text-slate-400">Component</th>
-                        <th className="p-4 font-bold text-sm text-slate-600 dark:text-slate-400">Score</th>
-                        <th className="p-4 font-bold text-sm text-slate-600 dark:text-slate-400">Band</th>
-                        <th className="p-4 font-bold text-sm text-slate-600 dark:text-slate-400">Content/Feedback</th>
-                        <th className="p-4 font-bold text-sm text-slate-600 dark:text-slate-400">Date</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {results.length > 0 ? (
-                        results.map((result) => (
-                          <tr key={result.id} className="border-b border-slate-100 dark:border-slate-800/50 hover:bg-slate-50 dark:hover:bg-slate-800/20 transition-colors">
-                            <td className="p-4 font-medium">{result.firstName} {result.lastName}</td>
-                            <td className="p-4 text-xs text-slate-500">{result.userName}</td>
-                            <td className="p-4 text-blue-600 dark:text-blue-400">{result.telegramUsername}</td>
-                            <td className="p-4 text-slate-600 dark:text-slate-400">{result.materialName}</td>
-                            <td className="p-4 text-slate-600 dark:text-slate-400">{result.component}</td>
-                            <td className="p-4 font-bold text-blue-600">{result.score}</td>
-                            <td className="p-4 font-black text-green-600">{result.bandScore || "N/A"}</td>
-                            <td className="p-4">
-                              {(result.content || result.aiFeedback) ? (
-                                <Button 
-                                  variant="ghost" 
-                                  size="sm" 
-                                  className="text-blue-600 h-8 px-2 text-[10px] font-bold uppercase tracking-widest"
-                                  onClick={() => {
-                                    const text = `STUDENT: ${result.firstName} ${result.lastName}\nUSERNAME: ${result.userName}\nTELEGRAM: ${result.telegramUsername}\nTEST: ${result.materialName}\nCOMPONENT: ${result.component}\nDATE: ${new Date(result.timestamp).toLocaleString()}\n\nCONTENT:\n${result.content || 'N/A'}\n\nAI EVALUATION:\n${result.aiFeedback || 'N/A'}`;
-                                    const blob = new Blob([text], { type: 'text/plain' });
-                                    const url = URL.createObjectURL(blob);
-                                    const link = document.createElement('a');
-                                    link.href = url;
-                                    link.download = `${result.firstName}_${result.lastName}_${result.component}_Evaluation.txt`;
-                                    link.click();
-                                    URL.revokeObjectURL(url);
-                                  }}
-                                >
-                                  Download
-                                </Button>
-                              ) : "N/A"}
-                            </td>
-                            <td className="p-4 text-xs text-slate-500">{new Date(result.timestamp).toLocaleString()}</td>
-                          </tr>
-                        ))
-                      ) : (
-                        <tr>
-                          <td colSpan={5} className="p-12 text-center text-slate-500">No results recorded yet.</td>
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-left border-collapse min-w-[800px]">
+                      <thead>
+                        <tr className="bg-slate-50 dark:bg-slate-800/50 border-b border-slate-200 dark:border-slate-800">
+                          <th className="p-4 cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors" onClick={() => toggleSort('studentName')}>
+                            <div className="flex items-center gap-2 text-sm font-bold text-slate-600 dark:text-slate-400">
+                              Student Name {resultSortField === 'studentName' && (resultSortOrder === 'asc' ? <ChevronDown className="h-3 w-3 rotate-180" /> : <ChevronDown className="h-3 w-3" />)}
+                              {resultSortField !== 'studentName' && <ArrowUpDown className="h-3 w-3 opacity-30" />}
+                            </div>
+                          </th>
+                          <th className="p-4 cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors" onClick={() => toggleSort('telegramUsername')}>
+                            <div className="flex items-center gap-2 text-sm font-bold text-slate-600 dark:text-slate-400">
+                              Telegram {resultSortField === 'telegramUsername' && (resultSortOrder === 'asc' ? <ChevronDown className="h-3 w-3 rotate-180" /> : <ChevronDown className="h-3 w-3" />)}
+                              {resultSortField !== 'telegramUsername' && <ArrowUpDown className="h-3 w-3 opacity-30" />}
+                            </div>
+                          </th>
+                          <th className="p-4 cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors" onClick={() => toggleSort('materialName')}>
+                            <div className="flex items-center gap-2 text-sm font-bold text-slate-600 dark:text-slate-400">
+                              Material {resultSortField === 'materialName' && (resultSortOrder === 'asc' ? <ChevronDown className="h-3 w-3 rotate-180" /> : <ChevronDown className="h-3 w-3" />)}
+                              {resultSortField !== 'materialName' && <ArrowUpDown className="h-3 w-3 opacity-30" />}
+                            </div>
+                          </th>
+                          <th className="p-4 cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors" onClick={() => toggleSort('component')}>
+                            <div className="flex items-center gap-2 text-sm font-bold text-slate-600 dark:text-slate-400">
+                              Component {resultSortField === 'component' && (resultSortOrder === 'asc' ? <ChevronDown className="h-3 w-3 rotate-180" /> : <ChevronDown className="h-3 w-3" />)}
+                              {resultSortField !== 'component' && <ArrowUpDown className="h-3 w-3 opacity-30" />}
+                            </div>
+                          </th>
+                          <th className="p-4 cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors" onClick={() => toggleSort('score')}>
+                            <div className="flex items-center gap-2 text-sm font-bold text-slate-600 dark:text-slate-400">
+                              Score {resultSortField === 'score' && (resultSortOrder === 'asc' ? <ChevronDown className="h-3 w-3 rotate-180" /> : <ChevronDown className="h-3 w-3" />)}
+                              {resultSortField !== 'score' && <ArrowUpDown className="h-3 w-3 opacity-30" />}
+                            </div>
+                          </th>
+                          <th className="p-4 cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors" onClick={() => toggleSort('timestamp')}>
+                            <div className="flex items-center gap-2 text-sm font-bold text-slate-600 dark:text-slate-400">
+                              Timestamp {resultSortField === 'timestamp' && (resultSortOrder === 'asc' ? <ChevronDown className="h-3 w-3 rotate-180" /> : <ChevronDown className="h-3 w-3" />)}
+                              {resultSortField !== 'timestamp' && <ArrowUpDown className="h-3 w-3 opacity-30" />}
+                            </div>
+                          </th>
                         </tr>
-                      )}
-                    </tbody>
-                  </table>
+                      </thead>
+                      <tbody>
+                        {sortedAndFilteredResults.length > 0 ? (
+                          sortedAndFilteredResults.map((result) => (
+                            <tr key={result.id} className="border-b border-slate-100 dark:border-slate-800/50 hover:bg-slate-50 dark:hover:bg-slate-800/20 transition-colors">
+                              <td className="p-4">
+                                <div className="flex items-center gap-3">
+                                  <div className="h-8 w-8 rounded-full bg-blue-50 dark:bg-blue-900/20 flex items-center justify-center text-blue-600 text-xs font-bold uppercase">
+                                    {result.studentName.charAt(0)}
+                                  </div>
+                                  <span className="font-bold text-slate-900 dark:text-white">{result.studentName}</span>
+                                </div>
+                              </td>
+                              <td className="p-4">
+                                <span className={result.telegramUsername ? "text-blue-600 dark:text-blue-400 font-medium" : "text-slate-400 italic"}>
+                                  {result.telegramUsername ? `@${result.telegramUsername.replace('@', '')}` : 'N/A'}
+                                </span>
+                              </td>
+                              <td className="p-4 text-sm text-slate-600 dark:text-slate-400 max-w-[200px] truncate" title={result.materialName}>
+                                {result.materialName}
+                              </td>
+                              <td className="p-4">
+                                <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-widest ${
+                                  result.component === 'Reading' ? 'bg-blue-100 text-blue-600' : 
+                                  result.component === 'Listening' ? 'bg-emerald-100 text-emerald-600' : 
+                                  result.component === 'Writing' ? 'bg-amber-100 text-amber-600' :
+                                  'bg-slate-100 text-slate-600'
+                                }`}>
+                                  {result.component}
+                                </span>
+                              </td>
+                              <td className="p-4">
+                                <div className="flex items-baseline gap-1">
+                                  <span className="font-black text-blue-600">{result.score}</span>
+                                  {result.bandScore && (
+                                    <span className="text-[10px] text-slate-400"> (Band: {result.bandScore})</span>
+                                  )}
+                                </div>
+                              </td>
+                              <td className="p-4 text-xs text-slate-500 whitespace-nowrap">
+                                {new Date(result.timestamp).toLocaleString()}
+                              </td>
+                            </tr>
+                          ))
+                        ) : (
+                          <tr>
+                            <td colSpan={6} className="p-12 text-center text-slate-500 italic">
+                              {resultSearch ? "No results match your search" : "No results recorded yet"}
+                            </td>
+                          </tr>
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
                 </div>
               </motion.div>
             )}
