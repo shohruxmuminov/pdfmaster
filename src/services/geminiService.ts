@@ -1,17 +1,27 @@
-import { GoogleGenerativeAI } from "@google/generative-ai";
+import { GoogleGenAI } from "@google/genai";
 
-const apiKey = process.env.GEMINI_API_KEY || "";
-const genAI = new GoogleGenerativeAI(apiKey);
+let genAIInstance: GoogleGenAI | null = null;
+
+function getGenAI() {
+  if (!genAIInstance) {
+    const apiKey = process.env.GEMINI_API_KEY || "";
+    genAIInstance = new GoogleGenAI({ apiKey });
+  }
+  return genAIInstance;
+}
 
 export const aiModels = {
-  chat: "gemini-2.0-flash",
+  chat: "gemini-3-flash-preview",
 };
 
 export async function analyzeContent(content: string, task: string) {
   try {
-    const model = genAI.getGenerativeModel({ model: aiModels.chat });
-    const result = await model.generateContent(`Task: ${task}\n\nContent:\n${content}`);
-    return result.response.text();
+    const genAI = getGenAI();
+    const response = await genAI.models.generateContent({
+      model: aiModels.chat,
+      contents: `Task: ${task}\n\nContent:\n${content}`
+    });
+    return response.text || "";
   } catch (error) {
     console.error("Gemini AI Error:", error);
     throw new Error("Failed to process content with Gemini AI.");

@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from "react";
-import { GoogleGenerativeAI } from "@google/generative-ai";
+import { GoogleGenAI } from "@google/genai";
 import { 
   ref, 
   uploadBytes, 
@@ -606,11 +606,7 @@ export function GeminiProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || "");
-  const geminiModel = genAI.getGenerativeModel({ 
-    model: "gemini-2.0-flash",
-    systemInstruction: "You are a helpful and versatile AI assistant. You can help with any topic, including IELTS, general knowledge, coding, creative writing, and more. Use Markdown for clear formatting."
-  });
+  const genAI = React.useMemo(() => new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || "" }), []);
 
   const generateAIResponse = async (prompt: string, systemInstruction?: string) => {
     if (!isGeminiEnabled) {
@@ -627,12 +623,13 @@ export function GeminiProvider({ children }: { children: React.ReactNode }) {
                            lowerPrompt.includes("rasm chiz");
 
     try {
-      const modelToUse = systemInstruction 
-        ? genAI.getGenerativeModel({ model: "gemini-2.0-flash", systemInstruction })
-        : geminiModel;
+      const response = await genAI.models.generateContent({
+        model: "gemini-3-flash-preview",
+        contents: prompt,
+        config: systemInstruction ? { systemInstruction } : undefined
+      });
 
-      const result = await modelToUse.generateContent(prompt);
-      let text = result.response.text();
+      let text = response.text || "I'm sorry, I couldn't generate a response.";
 
       if (isImageRequest) {
         const seed = Math.floor(Math.random() * 1000000);
@@ -654,26 +651,17 @@ export function GeminiProvider({ children }: { children: React.ReactNode }) {
     }
 
     try {
-      const modelToUse = systemInstruction 
-        ? genAI.getGenerativeModel({ model: "gemini-2.0-flash", systemInstruction })
-        : geminiModel;
-        
-      const result = await modelToUse.generateContentStream(prompt);
+      const response = await genAI.models.generateContentStream({
+        model: "gemini-3-flash-preview",
+        contents: prompt,
+        config: systemInstruction ? { systemInstruction } : undefined
+      });
       
-      // Create an async generator that mimics OpenAI stream for compatibility if needed, 
-      // but we can also just return a standardized stream object.
+      // Create an async generator that matches what AITutorModal expects (chunk.text)
       async function* geminiStream() {
-        for await (const chunk of result.stream) {
-          const text = chunk.text();
-          yield {
-            choices: [
-              {
-                delta: {
-                  content: text
-                }
-              }
-            ]
-          };
+        for await (const chunk of response) {
+          const text = chunk.text;
+          yield { text };
         }
       }
       
@@ -690,22 +678,23 @@ export function GeminiProvider({ children }: { children: React.ReactNode }) {
     }
 
     try {
-      const model = genAI.getGenerativeModel({ 
-        model: "gemini-2.0-flash",
-        systemInstruction: "You are an expert IELTS Speaking examiner. Analyze the provided audio and give feedback based on: Fluency and Coherence, Lexical Resource, Grammatical Range and Accuracy, and Pronunciation. Provide a band score estimate and clear tips for improvement."
+      const response = await genAI.models.generateContent({
+        model: "gemini-3-flash-preview",
+        contents: [
+          {
+            inlineData: {
+              data: audioBase64,
+              mimeType: mimeType
+            }
+          },
+          { text: "Analyze this IELTS Speaking attempt." }
+        ],
+        config: {
+          systemInstruction: "You are an expert IELTS Speaking examiner. Analyze the provided audio and give feedback based on: Fluency and Coherence, Lexical Resource, Grammatical Range and Accuracy, and Pronunciation. Provide a band score estimate and clear tips for improvement."
+        }
       });
 
-      const result = await model.generateContent([
-        {
-          inlineData: {
-            data: audioBase64,
-            mimeType: mimeType
-          }
-        },
-        "Analyze this IELTS Speaking attempt."
-      ]);
-
-      return result.response.text();
+      return response.text || "I encountered an error while analyzing your speaking.";
     } catch (error) {
       console.error("Gemini Speaking Analysis Error:", error);
       return "I encountered an error while analyzing your speaking. Please try again or check your internet connection.";
@@ -718,18 +707,20 @@ export function GeminiProvider({ children }: { children: React.ReactNode }) {
     }
 
     try {
-      const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
-      const result = await model.generateContent([
-        {
-          inlineData: {
-            data: audioBase64,
-            mimeType: mimeType
-          }
-        },
-        "Transcribe this audio exactly as spoken. Do not add any commentary."
-      ]);
+      const response = await genAI.models.generateContent({
+        model: "gemini-3-flash-preview",
+        contents: [
+          {
+            inlineData: {
+              data: audioBase64,
+              mimeType: mimeType
+            }
+          },
+          { text: "Transcribe this audio exactly as spoken. Do not add any commentary." }
+        ]
+      });
 
-      return result.response.text();
+      return response.text || "Transcription failed.";
     } catch (error) {
       console.error("Gemini Transcription Error:", error);
       return "Transcription failed.";
