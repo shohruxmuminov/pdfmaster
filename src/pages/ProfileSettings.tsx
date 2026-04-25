@@ -9,7 +9,7 @@ import { Moon, Sun, Monitor, Check, User, Save, Palette } from "lucide-react";
 import { motion } from "framer-motion";
 import { updateProfile } from "firebase/auth";
 import { doc, updateDoc } from "firebase/firestore";
-import { db } from "@/src/firebase";
+import { db, auth } from "@/src/firebase";
 
 const colorThemes: { id: ColorTheme; name: string; color: string }[] = [
   { id: "blue", name: "Blue", color: "bg-blue-500" },
@@ -51,9 +51,15 @@ export default function ProfileSettings() {
     setIsSaving(true);
     setSaveMessage("");
     try {
-      await updateProfile(user, { displayName });
-      await updateDoc(doc(db, "users", user.uid), { displayName });
-      setSaveMessage("Profile updated successfully!");
+      if (user.isGuest) {
+        setSaveMessage("Guest profiles cannot be updated.");
+      } else {
+        if (auth.currentUser) {
+          await updateProfile(auth.currentUser, { displayName });
+          await updateDoc(doc(db, "users", user.uid), { displayName });
+          setSaveMessage("Profile updated successfully!");
+        }
+      }
     } catch (error) {
       console.error("Error updating profile:", error);
       setSaveMessage("Failed to update profile.");

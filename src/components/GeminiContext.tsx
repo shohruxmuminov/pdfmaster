@@ -1,13 +1,13 @@
 import React, { createContext, useContext, useState, useEffect } from "react";
-import { GoogleGenerativeAI } from "@google/generative-ai";
+import { GoogleGenAI } from "@google/genai";
 import { 
   ref, 
   uploadBytes, 
   getDownloadURL 
 } from "firebase/storage";
-import { auth, db, storage } from "../firebase";
+import { db, storage, auth } from "../firebase";
 import { 
-  onAuthStateChanged, 
+  onAuthStateChanged,
   User 
 } from "firebase/auth";
 import { 
@@ -21,17 +21,20 @@ import {
   addDoc, 
   deleteDoc,
   updateDoc,
-  serverTimestamp
+  serverTimestamp,
+  increment,
+  runTransaction
 } from "firebase/firestore";
 
 interface Material {
   id: string;
   category: "Listening" | "Reading" | "Writing" | "Speaking" | "Books" | "Vocabulary" | "Mock Tests";
   subCategory?: "Listening" | "Reading" | "Writing" | "Speaking";
+  examType?: "IELTS" | "Multilevel";
   name: string;
-  mockTestId?: string; // Group ID for mock test components
-  type: string; // mimeType
-  content: string; // This will now store the download URL from Storage
+  mockTestId?: string;
+  type: string;
+  content: string;
   timestamp: number;
   isPremium?: boolean;
 }
@@ -86,8 +89,16 @@ interface CheatAlert {
   type: "fullscreen_exit";
 }
 
+export interface AppUser {
+  uid: string;
+  email: string | null;
+  displayName: string | null;
+  photoURL: string | null;
+  isGuest: boolean;
+}
+
 interface GeminiContextType {
-  user: User | null;
+  user: AppUser | null;
   loading: boolean;
   isGeminiEnabled: boolean;
   isPremium: boolean;
@@ -117,6 +128,8 @@ interface GeminiContextType {
   cheatAlerts: CheatAlert[];
   gradeMockTest: (rawScore: number) => number;
   grantPremiumStatus: (userId: string, role: "admin" | "teacher") => Promise<void>;
+  loginAsGuest: () => void;
+  logout: () => Promise<void>;
 }
 
 const GeminiContext = createContext<GeminiContextType | undefined>(undefined);
@@ -173,7 +186,7 @@ function handleFirestoreError(error: unknown, operationType: OperationType, path
 }
 
 export function GeminiProvider({ children }: { children: React.ReactNode }) {
-  const [user, setUser] = useState<User | null>(null);
+  const [user, setUser] = useState<AppUser | null>(null);
   const [loading, setLoading] = useState(true);
   const [isGeminiEnabled, setIsGeminiEnabled] = useState(true);
   const [role, setRole] = useState<"user" | "admin" | "teacher">("user");
@@ -190,48 +203,30 @@ export function GeminiProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     let unsubscribeUser: (() => void) | null = null;
+    let isGuestMode = localStorage.getItem("guest_mode") === "true";
 
-    const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
-      // Reset states immediately on auth change to prevent race conditions
-      setRole("user");
-      setIsBlocked(false);
-      setIsGeminiEnabled(false);
-      
-      setUser(currentUser);
-      
-      if (unsubscribeUser) {
-        unsubscribeUser();
-        unsubscribeUser = null;
-      }
-
+    const unsubscribeAuth = onAuthStateChanged(auth, async (currentUser) => {
       if (currentUser) {
-        // Session Persistence Check (1 month)
-        const lastActive = localStorage.getItem(`lastActive_${currentUser.uid}`);
-        const now = Date.now();
-        const oneMonth = 30 * 24 * 60 * 60 * 1000;
-
-        if (lastActive && now - parseInt(lastActive) > oneMonth) {
-          await auth.signOut();
-          localStorage.removeItem(`lastActive_${currentUser.uid}`);
-          setUser(null);
-          setLoading(false);
-          return;
-        }
+        localStorage.removeItem("guest_mode");
+        isGuestMode = false;
         
-        localStorage.setItem(`lastActive_${currentUser.uid}`, now.toString());
+        setUser({
+          uid: currentUser.uid,
+          email: currentUser.email,
+          displayName: currentUser.displayName,
+          photoURL: currentUser.photoURL,
+          isGuest: false
+        });
 
-        // Fetch user profile
         const userDocRef = doc(db, "users", currentUser.uid);
         
-        // Ensure user is in the database for admin to see
         await setDoc(userDocRef, {
           uid: currentUser.uid,
           email: currentUser.email,
           displayName: currentUser.displayName || currentUser.email?.split('@')[0] || "User",
-          lastActive: now
+          lastActive: Date.now()
         }, { merge: true });
 
-        // Real-time listener for user profile to handle blocking and role changes
         unsubscribeUser = onSnapshot(userDocRef, (docSnap) => {
           if (docSnap.exists()) {
             const userData = docSnap.data();
@@ -240,7 +235,6 @@ export function GeminiProvider({ children }: { children: React.ReactNode }) {
             setIsBlocked(userData.isBlocked || false);
             setIsGeminiEnabled(true);
           } else {
-            // Default for new users
             setRole("user");
             setIsBlocked(false);
             setIsGeminiEnabled(true);
@@ -251,22 +245,19 @@ export function GeminiProvider({ children }: { children: React.ReactNode }) {
           setLoading(false);
         });
 
-        // Check for default admin
-        const isDefaultAdmin = currentUser.email === "shohruxmuminov201@gmail.com";
-        if (isDefaultAdmin) {
-          try {
-            await setDoc(userDocRef, {
-              uid: currentUser.uid,
-              email: currentUser.email,
-              premiumStatus: "approved",
-              role: "admin",
-              displayName: currentUser.displayName || "Admin",
-              createdAt: new Date().toISOString()
-            }, { merge: true });
-          } catch (error) {
-            console.error("Error setting default admin:", error);
-          }
-        }
+      } else if (isGuestMode) {
+        setUser({
+          uid: "guest-" + Math.random().toString(36).substr(2, 9),
+          email: "student@guest.local",
+          displayName: "Student",
+          photoURL: null,
+          isGuest: true
+        });
+        setRole("user");
+        setIsBlocked(false);
+        setIsGeminiEnabled(true);
+        setExpiryDate(null);
+        setLoading(false);
       } else {
         setUser(null);
         setRole("user");
@@ -280,10 +271,25 @@ export function GeminiProvider({ children }: { children: React.ReactNode }) {
     });
 
     return () => {
-      unsubscribe();
+      unsubscribeAuth();
       if (unsubscribeUser) unsubscribeUser();
     };
   }, []);
+
+  const loginAsGuest = () => {
+    localStorage.setItem("guest_mode", "true");
+    window.location.href = "/";
+  };
+
+  const logout = async () => {
+    if (localStorage.getItem("guest_mode") === "true") {
+      localStorage.removeItem("guest_mode");
+      window.location.href = "/auth";
+    } else {
+      await auth.signOut();
+      window.location.href = "/auth";
+    }
+  };
 
   // Global settings listener
   useEffect(() => {
@@ -350,7 +356,6 @@ export function GeminiProvider({ children }: { children: React.ReactNode }) {
         setAllUsers(data);
       }, (error) => {
         console.error("Users listener error:", error);
-        // Don't throw here to avoid crashing the app for non-admins during transitions
       });
 
       const qAlerts = query(collection(db, "alerts"), orderBy("timestamp", "desc"));
@@ -374,7 +379,7 @@ export function GeminiProvider({ children }: { children: React.ReactNode }) {
   // Check for expiry
   useEffect(() => {
     if (isPremium && expiryDate && Date.now() > expiryDate) {
-      if (user) {
+      if (user && !user.isGuest) {
         updateDoc(doc(db, "users", user.uid), {
           expiryDate: null
         });
@@ -410,7 +415,6 @@ export function GeminiProvider({ children }: { children: React.ReactNode }) {
         if (file) {
           size = file.size;
         } else if (contentString) {
-          // rough estimate of string byte size
           size = contentString.length;
         }
 
@@ -418,10 +422,7 @@ export function GeminiProvider({ children }: { children: React.ReactNode }) {
         const isHtml = resolvedType.includes("html");
 
         try {
-          // Always try Storage first for everything. AI Studio might not have it configured,
-          // but we give it a reasonable timeout (e.g., 10 seconds for large files).
           const fileName = file ? file.name : `manual_${Date.now()}.html`;
-          // clean up spaces
           const safeName = fileName.replace(/[^a-zA-Z0-9.\-_]/g, '_');
           const storageRef = ref(storage, `materials/${Date.now()}_${safeName}`);
           
@@ -433,23 +434,16 @@ export function GeminiProvider({ children }: { children: React.ReactNode }) {
           }
           
           if (uploadPromise) {
-            // Race the upload against a 10-second timeout
             const snapshot = await Promise.race([
               uploadPromise,
-              new Promise((_, reject) => setTimeout(() => reject(new Error("Storage upload timed out (Bucket might not be configured, or file is very large)")), 10000))
+              new Promise((_, reject) => setTimeout(() => reject(new Error("Storage upload timed out")), 10000))
             ]);
             contentUrl = await getDownloadURL((snapshot as any).ref);
-            console.log("Storage upload successful:", contentUrl);
           }
         } catch (storageError: any) {
-          console.warn("Storage upload failed, attempting Firestore fallback:", storageError.message || storageError);
-          
-          // Fallback to storing directly in Firestore (strict 1MB limit for document)
-          // We limit media strictly to < 950,000 bytes just to be safe.
           const MAX_FIRESTORE_SIZE = 950000;
-          
           if (size >= MAX_FIRESTORE_SIZE) {
-            throw new Error(`Upload failed: File is too large (${Math.round(size/1024)}KB). Maximum size without proper Firebase Storage is ~1MB.`);
+            throw new Error(`Upload failed: File is too large.`);
           }
 
           if (isHtml) {
@@ -465,7 +459,6 @@ export function GeminiProvider({ children }: { children: React.ReactNode }) {
                contentUrl = rawHtml;
              }
           } else {
-            // Non-HTML files MUST be converted to base64 Data URLs
             if (contentString && contentString.startsWith("data:")) {
               contentUrl = contentString;
             } else if (file) {
@@ -565,18 +558,15 @@ export function GeminiProvider({ children }: { children: React.ReactNode }) {
       let aiFeedback = "";
       let bandScore = "";
 
-      // Automated Band Score for Listening/Reading
       if ((result.component === "Listening" || result.component === "Reading") && result.score) {
-        const rawScoreMatch = result.score.match(/^(\d+)/);
+        const rawScoreMatch = result.score.match(/^(\\d+)/);
         if (rawScoreMatch) {
           const rawScore = parseInt(rawScoreMatch[1]);
           bandScore = calculateBandScore(rawScore);
         }
       }
       
-      // If writing task is present, get AI feedback
       if (result.component === "Writing" && result.content) {
-        // Assuming taskType 2 for generic writing tasks if not specified
         aiFeedback = await gradeWritingTask(2, result.content) || "AI Grading failed.";
       }
 
@@ -584,7 +574,7 @@ export function GeminiProvider({ children }: { children: React.ReactNode }) {
         ...result,
         bandScore,
         aiFeedback,
-        userId: user?.uid,
+        userId: user?.uid || "mock-user",
         userName: user?.displayName || user?.email || "Anonymous",
         timestamp: Date.now()
       });
@@ -606,14 +596,13 @@ export function GeminiProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  const genAI = React.useMemo(() => new GoogleGenerativeAI(process.env.GEMINI_API_KEY || ""), []);
+  const genAI = React.useMemo(() => new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || "" }), []);
 
   const generateAIResponse = async (prompt: string, systemInstruction?: string) => {
     if (!isGeminiEnabled) {
       throw new Error("AI is not enabled. Please activate Premium Plus.");
     }
 
-    // Check for image generation request
     const lowerPrompt = prompt.toLowerCase();
     const isImageRequest = lowerPrompt.includes("generate image") || 
                            lowerPrompt.includes("draw") || 
@@ -623,13 +612,14 @@ export function GeminiProvider({ children }: { children: React.ReactNode }) {
                            lowerPrompt.includes("rasm chiz");
 
     try {
-      const model = genAI.getGenerativeModel({
-        model: "gemini-1.5-flash",
-        systemInstruction
+      const config: any = {};
+      if (systemInstruction) config.systemInstruction = systemInstruction;
+      const response = await genAI.models.generateContent({
+        model: "gemini-3-flash-preview",
+        contents: prompt,
+        config
       });
-      const result = await model.generateContent(prompt);
-      const response = await result.response;
-      let text = response.text() || "I'm sorry, I couldn't generate a response.";
+      let text = response.text || "I'm sorry, I couldn't generate a response.";
 
       if (isImageRequest) {
         const seed = Math.floor(Math.random() * 1000000);
@@ -651,16 +641,17 @@ export function GeminiProvider({ children }: { children: React.ReactNode }) {
     }
 
     try {
-      const model = genAI.getGenerativeModel({
-        model: "gemini-1.5-flash",
-        systemInstruction
+      const config: any = {};
+      if (systemInstruction) config.systemInstruction = systemInstruction;
+      const response = await genAI.models.generateContentStream({
+        model: "gemini-3-flash-preview",
+        contents: prompt,
+        config
       });
-      const result = await model.generateContentStream(prompt);
       
-      // Create an async generator that matches what AITutorModal expects (chunk.text)
       async function* geminiStream() {
-        for await (const chunk of result.stream) {
-          const text = chunk.text();
+        for await (const chunk of response) {
+          const text = chunk.text;
           yield { text };
         }
       }
@@ -678,23 +669,24 @@ export function GeminiProvider({ children }: { children: React.ReactNode }) {
     }
 
     try {
-      const model = genAI.getGenerativeModel({
-        model: "gemini-1.5-flash",
-        systemInstruction: "You are an expert IELTS Speaking examiner. Analyze the provided audio and give feedback based on: Fluency and Coherence, Lexical Resource, Grammatical Range and Accuracy, and Pronunciation. Provide a band score estimate and clear tips for improvement."
-      });
-
-      const result = await model.generateContent([
-        {
-          inlineData: {
-            data: audioBase64,
-            mimeType: mimeType
-          }
+      let dataStr = audioBase64;
+      if (dataStr.startsWith('data:')) {
+        const parts = dataStr.split(',');
+        dataStr = parts[1];
+      }
+      const response = await genAI.models.generateContent({
+        model: "gemini-3-flash-preview",
+        contents: {
+          parts: [
+            { inlineData: { data: dataStr, mimeType: mimeType } },
+            { text: "Analyze this IELTS Speaking attempt." }
+          ]
         },
-        { text: "Analyze this IELTS Speaking attempt." }
-      ]);
-      const response = await result.response;
-
-      return response.text() || "I encountered an error while analyzing your speaking.";
+        config: {
+          systemInstruction: "You are an expert IELTS Speaking examiner. Analyze the provided audio and give feedback based on: Fluency and Coherence, Lexical Resource, Grammatical Range and Accuracy, and Pronunciation. Provide a band score estimate and clear tips for improvement."
+        }
+      });
+      return response.text || "I encountered an error while analyzing your speaking.";
     } catch (error) {
       console.error("Gemini Speaking Analysis Error:", error);
       return "I encountered an error while analyzing your speaking. Please try again or check your internet connection.";
@@ -707,21 +699,21 @@ export function GeminiProvider({ children }: { children: React.ReactNode }) {
     }
 
     try {
-      const model = genAI.getGenerativeModel({
-        model: "gemini-1.5-flash"
+      let dataStr = audioBase64;
+      if (dataStr.startsWith('data:')) {
+        const parts = dataStr.split(',');
+        dataStr = parts[1];
+      }
+      const response = await genAI.models.generateContent({
+        model: "gemini-3-flash-preview",
+        contents: {
+          parts: [
+            { inlineData: { data: dataStr, mimeType: mimeType } },
+            { text: "Transcribe this audio exactly as spoken. Do not add any commentary." }
+          ]
+        }
       });
-      const result = await model.generateContent([
-        {
-          inlineData: {
-            data: audioBase64,
-            mimeType: mimeType
-          }
-        },
-        { text: "Transcribe this audio exactly as spoken. Do not add any commentary." }
-      ]);
-      const response = await result.response;
-
-      return response.text() || "Transcription failed.";
+      return response.text || "Transcription failed.";
     } catch (error) {
       console.error("Gemini Transcription Error:", error);
       return "Transcription failed.";
@@ -789,8 +781,8 @@ export function GeminiProvider({ children }: { children: React.ReactNode }) {
       if (!user) return;
       await setDoc(doc(db, "users", userId), {
         uid: userId,
-        email: user.email,
-        expiryDate: Date.now() + (365 * 24 * 60 * 60 * 1000), // 1 year
+        email: user.email || "no-email",
+        expiryDate: Date.now() + (365 * 24 * 60 * 60 * 1000), 
         role: role,
         displayName: user.displayName || (role === "admin" ? "Admin" : "Teacher"),
         createdAt: new Date().toISOString()
@@ -830,7 +822,9 @@ export function GeminiProvider({ children }: { children: React.ReactNode }) {
       allUsers,
       cheatAlerts,
       gradeMockTest,
-      grantPremiumStatus
+      grantPremiumStatus,
+      loginAsGuest,
+      logout
     }}>
       {children}
     </GeminiContext.Provider>

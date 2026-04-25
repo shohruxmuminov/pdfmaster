@@ -57,6 +57,7 @@ export default function IELTSSection() {
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [activeFilter, setActiveFilter] = useState("All Tests");
+  const [activeExamType, setActiveExamType] = useState<"IELTS" | "Multilevel">("IELTS");
   const [isAITutorOpen, setIsAITutorOpen] = useState(false);
   const [showCheatWarning, setShowCheatWarning] = useState(false);
   const [timeLeft, setTimeLeft] = useState(3600);
@@ -275,6 +276,12 @@ export default function IELTSSection() {
 
   const sectionMaterials = materials.filter(m => {
     const cat = category?.toLowerCase();
+    
+    // Check if the material matches the active exam type for allowed categories
+    if (cat === "listening" || cat === "reading" || cat === "writing" || cat === "mock-tests") {
+      if ((m.examType || "IELTS") !== activeExamType) return false;
+    }
+
     if (cat === "mock-tests") return m.category === "Mock Tests";
     return m.category.toLowerCase() === cat;
   });
@@ -533,7 +540,29 @@ export default function IELTSSection() {
                     <Button asChild className="bg-red-600 hover:bg-red-700 text-white rounded-lg h-10 px-4">
                       <Link to="/"><HomeIcon className="h-4 w-4 mr-2" /> Back Home</Link>
                     </Button>
-                    <div className="flex items-center gap-2 text-sm font-medium text-slate-600 dark:text-slate-400">
+                    <div className="flex bg-slate-100 dark:bg-slate-800 p-1 rounded-xl">
+                      <button
+                        onClick={() => setActiveExamType("IELTS")}
+                        className={`px-4 py-1.5 rounded-lg text-sm font-bold transition-all ${
+                          activeExamType === "IELTS" 
+                            ? "bg-white dark:bg-slate-900 text-red-600 shadow-sm" 
+                            : "text-slate-500 hover:text-slate-700 dark:text-slate-400"
+                        }`}
+                      >
+                        IELTS
+                      </button>
+                      <button
+                        onClick={() => setActiveExamType("Multilevel")}
+                        className={`px-4 py-1.5 rounded-lg text-sm font-bold transition-all ${
+                          activeExamType === "Multilevel" 
+                            ? "bg-white dark:bg-slate-900 text-red-600 shadow-sm" 
+                            : "text-slate-500 hover:text-slate-700 dark:text-slate-400"
+                        }`}
+                      >
+                        Multilevel
+                      </button>
+                    </div>
+                    <div className="flex items-center gap-2 text-sm font-medium text-slate-600 dark:text-slate-400 hidden sm:flex">
                       <LayoutGrid className="h-4 w-4 text-slate-400" />
                       Available Question Sets: <span className="text-red-600 font-bold">{sectionMaterials.length}</span>
                     </div>
@@ -598,42 +627,70 @@ export default function IELTSSection() {
                 {/* Main Content */}
                 <main className="flex-1">
                   {sectionConfig.type === "standard" && (
-                    <div className="flex flex-col md:flex-row md:items-center justify-between mb-8 gap-4">
-                      <div className="flex gap-2">
-                        <button
-                          onClick={() => setActiveTab("free")}
-                          className={`px-6 py-3 rounded-2xl font-bold text-sm transition-all ${
-                            activeTab === "free" 
-                              ? "bg-blue-600 text-white shadow-lg shadow-blue-600/20" 
-                              : "bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-400 border border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800"
-                          }`}
-                        >
-                          Free Tests
-                        </button>
-                        <button
-                          onClick={() => setActiveTab("premium")}
-                          className={`px-6 py-3 rounded-2xl font-bold text-sm transition-all flex items-center gap-2 ${
-                            activeTab === "premium" 
-                              ? "bg-amber-500 text-white shadow-lg shadow-amber-500/20" 
-                              : "bg-white dark:bg-slate-900 text-amber-600 dark:text-amber-500 border border-amber-200 dark:border-amber-900/30 hover:bg-amber-50 dark:hover:bg-amber-900/10"
-                          }`}
-                        >
-                          <Star className="h-4 w-4" /> Premium
-                        </button>
+                    <div className="flex flex-col xl:flex-row xl:items-center justify-between mb-8 gap-4">
+                      <div className="flex flex-col sm:flex-row gap-2">
+                        {category?.toLowerCase() !== "books" && category?.toLowerCase() !== "vocabulary" && (
+                          <div className="flex gap-1 bg-slate-200 dark:bg-slate-800/50 p-1 rounded-2xl sm:mr-2 overflow-x-auto shrink-0">
+                            <button
+                              onClick={() => setActiveExamType("IELTS")}
+                              className={`px-6 py-2 rounded-xl font-bold text-sm transition-all whitespace-nowrap ${
+                                activeExamType === "IELTS" 
+                                  ? "bg-white dark:bg-slate-900 text-blue-600 shadow-sm" 
+                                  : "text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800"
+                              }`}
+                            >
+                              IELTS
+                            </button>
+                            <button
+                              onClick={() => setActiveExamType("Multilevel")}
+                              className={`px-6 py-2 rounded-xl font-bold text-sm transition-all whitespace-nowrap ${
+                                activeExamType === "Multilevel" 
+                                  ? "bg-white dark:bg-slate-900 text-blue-600 shadow-sm" 
+                                  : "text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800"
+                              }`}
+                            >
+                              Multilevel
+                            </button>
+                          </div>
+                        )}
+                        <div className="flex gap-2">
+                          <button
+                            onClick={() => setActiveTab("free")}
+                            className={`px-6 py-3 rounded-2xl font-bold text-sm transition-all ${
+                              activeTab === "free" 
+                                ? "bg-blue-600 text-white shadow-lg shadow-blue-600/20" 
+                                : "bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-400 border border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800"
+                            }`}
+                          >
+                            Free Tests
+                          </button>
+                          <button
+                            onClick={() => setActiveTab("premium")}
+                            className={`px-6 py-3 rounded-2xl font-bold text-sm transition-all flex items-center gap-2 ${
+                              activeTab === "premium" 
+                                ? "bg-amber-500 text-white shadow-lg shadow-amber-500/20" 
+                                : "bg-white dark:bg-slate-900 text-amber-600 dark:text-amber-500 border border-amber-200 dark:border-amber-900/30 hover:bg-amber-50 dark:hover:bg-amber-900/10"
+                            }`}
+                          >
+                            <Star className="h-4 w-4" /> Premium
+                          </button>
+                        </div>
                       </div>
-                      <div className="relative flex-1 max-w-md">
-                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
-                        <input 
-                          type="text" 
-                          placeholder="Search materials..."
-                          value={searchQuery}
-                          onChange={(e) => setSearchQuery(e.target.value)}
-                          className="w-full pl-10 pr-4 py-3 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 focus:ring-2 focus:ring-blue-500 outline-none transition-all shadow-sm"
-                        />
-                      </div>
-                      <div className="flex items-center gap-2 text-sm text-slate-500 bg-white dark:bg-slate-900 px-4 py-2 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm">
-                        <TrendingUp className="h-4 w-4 text-green-500" />
-                        <span>{filteredMaterials.length} Materials Available</span>
+                      <div className="flex flex-1 max-w-md gap-4 items-center">
+                        <div className="relative flex-1">
+                          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+                          <input 
+                            type="text" 
+                            placeholder="Search materials..."
+                            value={searchQuery}
+                            onChange={(e) => setSearchQuery(e.target.value)}
+                            className="w-full pl-10 pr-4 py-3 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 focus:ring-2 focus:ring-blue-500 outline-none transition-all shadow-sm"
+                          />
+                        </div>
+                        <div className="hidden md:flex items-center gap-2 text-sm text-slate-500 bg-white dark:bg-slate-900 px-4 py-3 shrink-0 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm">
+                          <TrendingUp className="h-4 w-4 text-green-500" />
+                          <span>{filteredMaterials.length} Available</span>
+                        </div>
                       </div>
                     </div>
                   )}

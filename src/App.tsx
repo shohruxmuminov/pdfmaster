@@ -19,11 +19,12 @@ function ScrollToTop() {
   return null;
 }
 
-function ProtectedRoute({ children }: { children: React.ReactNode }) {
+function ProtectedRoute({ children, requireAuth = false }: { children: React.ReactNode, requireAuth?: boolean }) {
   const { user, loading } = useGemini();
   
   if (loading) return null;
   if (!user) return <Navigate to="/auth" />;
+  if (requireAuth && user.isGuest) return <Navigate to="/" />;
   
   return <>{children}</>;
 }
@@ -34,8 +35,8 @@ function AppRoutes() {
       <Route path="/auth" element={<Auth />} />
       <Route path="/" element={<Layout />}>
         <Route index element={<Home />} />
-        <Route path="admin" element={<ProtectedRoute><AdminPanel /></ProtectedRoute>} />
-        <Route path="teacher" element={<ProtectedRoute><TeacherPanel /></ProtectedRoute>} />
+        <Route path="admin" element={<ProtectedRoute requireAuth><AdminPanel /></ProtectedRoute>} />
+        <Route path="teacher" element={<ProtectedRoute requireAuth><TeacherPanel /></ProtectedRoute>} />
         <Route path="settings" element={<ProtectedRoute><ProfileSettings /></ProtectedRoute>} />
         <Route path=":category" element={<ProtectedRoute><IELTSSection /></ProtectedRoute>} />
       </Route>

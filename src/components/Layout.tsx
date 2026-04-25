@@ -6,14 +6,12 @@ import { ThemeToggle } from "./ThemeToggle";
 import { ScheduleCalendar } from "./ScheduleCalendar";
 import { Sidebar } from "./Sidebar";
 import { useGemini } from "./GeminiContext";
-import { auth } from "../firebase";
-import { signOut } from "firebase/auth";
 
 export default function Layout() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
   const [isCalendarOpen, setIsCalendarOpen] = useState(false);
-  const { user, role } = useGemini();
+  const { user, role, logout } = useGemini();
   const location = useLocation();
   const navigate = useNavigate();
 
@@ -32,8 +30,7 @@ export default function Layout() {
   }, []);
 
   const handleLogout = async () => {
-    await signOut(auth);
-    navigate("/");
+    await logout();
   };
 
   const navLinks = [
@@ -159,10 +156,12 @@ export default function Layout() {
               
               {user ? (
                 <>
-                  <Link to="/admin" className="p-3 rounded-xl text-base font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-900 flex items-center gap-3">
-                    <UserIcon className="h-5 w-5" />
-                    Admin Panel
-                  </Link>
+                  {(role === "admin" || role === "teacher") && (
+                    <Link to={role === "admin" ? "/admin" : "/teacher"} className="p-3 rounded-xl text-base font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-900 flex items-center gap-3">
+                      <Shield className="h-5 w-5" />
+                      {role === "admin" ? "Admin Panel" : "Teacher Panel"}
+                    </Link>
+                  )}
                   <button 
                     onClick={handleLogout}
                     className="p-3 rounded-xl text-base font-medium text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 flex items-center gap-3 w-full text-left"

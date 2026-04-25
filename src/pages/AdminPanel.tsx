@@ -87,6 +87,7 @@ export default function AdminPanel() {
     name: "", 
     category: "Listening" as any,
     subCategory: "Listening" as any,
+    examType: "IELTS" as "IELTS" | "Multilevel",
     mockTestId: "",
     isPremium: false
   });
@@ -195,6 +196,7 @@ export default function AdminPanel() {
               name: `${mockName} - ${section}`,
               category: "Mock Tests",
               subCategory: section,
+              examType: materialForm.examType,
               mockTestId: mockName,
               type: isHtmlExt ? "text/html" : (file.type || "text/html"),
               isPremium: materialForm.isPremium,
@@ -214,13 +216,14 @@ export default function AdminPanel() {
           name: isAutoName ? (fileName || "Manual Material") : materialForm.name,
           category: materialForm.category,
           ...(materialForm.category === "Books" ? { subCategory: materialForm.subCategory } : {}),
+          examType: materialForm.category === "Listening" || materialForm.category === "Reading" || materialForm.category === "Writing" ? materialForm.examType : undefined,
           type: fileType || "text/html",
           isPremium: materialForm.isPremium,
           content: ""
         }, selectedFile || undefined, fileContent || undefined);
       }
 
-      setMaterialForm({ name: "", category: "Listening", subCategory: "Listening", mockTestId: "", isPremium: false });
+      setMaterialForm({ name: "", category: "Listening", subCategory: "Listening", examType: "IELTS", mockTestId: "", isPremium: false });
       setFileContent(null);
       setSelectedFile(null);
       setFileName("");
@@ -549,6 +552,20 @@ export default function AdminPanel() {
                         </select>
                       </div>
 
+                      {(materialForm.category === "Listening" || materialForm.category === "Reading" || materialForm.category === "Writing" || materialForm.category === "Mock Tests") && (
+                        <div className="space-y-2">
+                          <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Exam Type</label>
+                          <select 
+                            value={materialForm.examType}
+                            onChange={(e) => setMaterialForm({ ...materialForm, examType: e.target.value as any })}
+                            className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900 outline-none focus:ring-2 focus:ring-blue-500"
+                          >
+                            <option value="IELTS">IELTS</option>
+                            <option value="Multilevel">Multilevel (CEFR)</option>
+                          </select>
+                        </div>
+                      )}
+
                       {materialForm.category === "Books" && (
                         <div className="space-y-2">
                           <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Sub-Category</label>
@@ -632,7 +649,7 @@ export default function AdminPanel() {
                         type="button"
                         variant="outline"
                         onClick={() => {
-                          setMaterialForm({ name: "", category: "Listening", subCategory: "Listening", mockTestId: "", isPremium: false });
+                          setMaterialForm({ name: "", category: "Listening", subCategory: "Listening", examType: "IELTS", mockTestId: "", isPremium: false });
                           setFileContent(null);
                           setSelectedFile(null);
                           setFileName("");
