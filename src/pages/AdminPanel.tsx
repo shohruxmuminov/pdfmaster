@@ -215,8 +215,8 @@ export default function AdminPanel() {
         await addMaterial({
           name: isAutoName ? (fileName || "Manual Material") : materialForm.name,
           category: materialForm.category,
-          ...(materialForm.category === "Books" ? { subCategory: materialForm.subCategory } : {}),
-          examType: materialForm.category === "Listening" || materialForm.category === "Reading" || materialForm.category === "Writing" ? materialForm.examType : undefined,
+          subCategory: materialForm.subCategory || materialForm.category,
+          examType: (materialForm.category === "Listening" || materialForm.category === "Reading" || materialForm.category === "Writing" || materialForm.category === "Mock Tests") ? materialForm.examType : undefined,
           type: fileType || "text/html",
           isPremium: materialForm.isPremium,
           content: ""

@@ -34,7 +34,8 @@ import {
   Ban,
   Lock,
   AlertTriangle,
-  Star
+  Star,
+  Zap
 } from "lucide-react";
 
 import { BlobIframe } from "../components/BlobIframe";
@@ -166,10 +167,13 @@ export default function IELTSSection() {
 
   const sectionConfig = useMemo(() => {
     const cat = category?.toLowerCase();
+    const isMultilevel = activeExamType === "Multilevel";
+    const prefix = isMultilevel ? "Multilevel" : "IELTS";
+
     switch (cat) {
       case "listening":
         return {
-          title: "IELTS Listening Tests",
+          title: `${prefix} Listening Tests`,
           subtitle: "Authentic audio materials with native speakers to improve your listening comprehension",
           icon: <Headphones className="h-8 w-8" />,
           color: "bg-[#107c54]",
@@ -182,8 +186,8 @@ export default function IELTSSection() {
         };
       case "reading":
         return {
-          title: "IELTS Reading Tests",
-          subtitle: "Comprehensive reading practice with authentic IELTS materials and detailed feedback",
+          title: `${prefix} Reading Tests`,
+          subtitle: "Comprehensive reading practice with authentic materials and detailed feedback",
           icon: <BookOpen className="h-8 w-8" />,
           color: "bg-[#2563eb]",
           textColor: "text-[#2563eb]",
@@ -195,7 +199,7 @@ export default function IELTSSection() {
         };
       case "writing":
         return {
-          title: "IELTS Writing Practice",
+          title: `${prefix} Writing Practice`,
           subtitle: "Choose a question set to practice your academic or general writing tasks",
           icon: <PenTool className="h-8 w-8" />,
           color: "bg-[#ef4444]",
@@ -208,7 +212,7 @@ export default function IELTSSection() {
         };
       case "speaking":
         return {
-          title: "IELTS Speaking Practice",
+          title: `${prefix} Speaking Practice`,
           subtitle: "Practice real speaking topics with AI feedback and native-like prompts",
           icon: <Mic2 className="h-8 w-8" />,
           color: "bg-[#8b5cf6]",
@@ -221,8 +225,8 @@ export default function IELTSSection() {
         };
       case "books":
         return {
-          title: "Premium IELTS Books",
-          subtitle: "Exclusive collection of the best IELTS preparation books and study guides",
+          title: `Premium ${prefix} Books`,
+          subtitle: "Exclusive collection of the best preparation books and study guides",
           icon: <BookOpen className="h-8 w-8" />,
           color: "bg-[#f59e0b]",
           textColor: "text-[#f59e0b]",
@@ -234,7 +238,7 @@ export default function IELTSSection() {
         };
       case "vocabulary":
         return {
-          title: "Premium Vocabulary",
+          title: `Premium Vocabulary`,
           subtitle: "Aid high-level vocabulary with our curated lists and practice materials",
           icon: <Sparkles className="h-8 w-8" />,
           color: "bg-[#ec4899]",
@@ -247,8 +251,8 @@ export default function IELTSSection() {
         };
       case "mock-tests":
         return {
-          title: "Full Mock Tests",
-          subtitle: "Complete IELTS exam simulations to test your readiness for the real exam",
+          title: `Full ${prefix} Mock Tests`,
+          subtitle: "Complete exam simulations to test your readiness for the real exam",
           icon: <Trophy className="h-8 w-8" />,
           color: "bg-[#0f172a]",
           textColor: "text-[#0f172a]",
@@ -260,8 +264,8 @@ export default function IELTSSection() {
         };
       default:
         return {
-          title: "IELTS Practice",
-          subtitle: "Aid your IELTS skills with our premium materials",
+          title: `${prefix} Practice`,
+          subtitle: "Aid your skills with our premium materials",
           icon: <Sparkles className="h-8 w-8" />,
           color: "bg-slate-900",
           textColor: "text-slate-900",
@@ -272,7 +276,7 @@ export default function IELTSSection() {
           type: "standard"
         };
     }
-  }, [category]);
+  }, [category, activeExamType]);
 
   const sectionMaterials = materials.filter(m => {
     const cat = category?.toLowerCase();
@@ -532,101 +536,70 @@ export default function IELTSSection() {
               </div>
             </div>
 
-            {/* Writing Specific Sub-header */}
-            {sectionConfig.type === "writing" && (
-              <div className="bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 shadow-sm sticky top-16 z-40">
-                <div className="container mx-auto px-4 h-16 flex items-center justify-between">
-                  <div className="flex items-center gap-6">
-                    <Button asChild className="bg-red-600 hover:bg-red-700 text-white rounded-lg h-10 px-4">
-                      <Link to="/"><HomeIcon className="h-4 w-4 mr-2" /> Back Home</Link>
-                    </Button>
-                    <div className="flex bg-slate-100 dark:bg-slate-800 p-1 rounded-xl">
-                      <button
-                        onClick={() => setActiveExamType("IELTS")}
-                        className={`px-4 py-1.5 rounded-lg text-sm font-bold transition-all ${
-                          activeExamType === "IELTS" 
-                            ? "bg-white dark:bg-slate-900 text-red-600 shadow-sm" 
-                            : "text-slate-500 hover:text-slate-700 dark:text-slate-400"
-                        }`}
-                      >
-                        IELTS
-                      </button>
-                      <button
-                        onClick={() => setActiveExamType("Multilevel")}
-                        className={`px-4 py-1.5 rounded-lg text-sm font-bold transition-all ${
-                          activeExamType === "Multilevel" 
-                            ? "bg-white dark:bg-slate-900 text-red-600 shadow-sm" 
-                            : "text-slate-500 hover:text-slate-700 dark:text-slate-400"
-                        }`}
-                      >
-                        Multilevel
-                      </button>
-                    </div>
-                    <div className="flex items-center gap-2 text-sm font-medium text-slate-600 dark:text-slate-400 hidden sm:flex">
-                      <LayoutGrid className="h-4 w-4 text-slate-400" />
-                      Available Question Sets: <span className="text-red-600 font-bold">{sectionMaterials.length}</span>
-                    </div>
-                  </div>
-                  <Button 
-                    onClick={() => setIsAITutorOpen(true)}
-                    className="bg-[#8b5cf6] hover:bg-[#7c3aed] text-white rounded-lg h-10"
-                  >
-                    <Bot className="h-4 w-4 mr-2" /> Gemini AI Essay Checker
-                  </Button>
-                </div>
-              </div>
-            )}
+
 
             <div className="container mx-auto px-4 py-8">
               <div className="flex flex-col lg:flex-row gap-8">
-                {/* Sidebar (Only for standard sections) */}
-                {sectionConfig.type === "standard" && (
-                  <aside className="w-full lg:w-64 space-y-6">
-                    <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-800 p-6">
-                      <h3 className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-6">Filter Tests</h3>
-                      <div className="space-y-2">
-                        {sidebarFilters.map((filter) => (
-                          <button
-                            key={filter.name}
-                            onClick={() => setActiveFilter(filter.name)}
-                            className={`w-full flex items-center justify-between p-3 rounded-xl transition-all text-sm font-medium ${
-                              activeFilter === filter.name
-                                ? `${sectionConfig.color} text-white shadow-lg shadow-blue-500/20`
-                                : "text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800"
-                            }`}
-                          >
-                            <div className="flex items-center gap-3">
-                              {filter.name === "All Tests" ? <LayoutGrid className="h-4 w-4" /> : <sectionConfig.sidebarIcon className="h-4 w-4" />}
-                              {filter.name}
-                            </div>
-                            <span className={`px-2 py-0.5 rounded-full text-[10px] ${
-                              activeFilter === filter.name ? "bg-white/20 text-white" : "bg-slate-100 dark:bg-slate-800 text-slate-500"
-                            }`}>
-                              {filter.count}
-                            </span>
-                          </button>
-                        ))}
-                      </div>
+                {/* Sidebar */}
+                <aside className="w-full lg:w-64 space-y-6">
+                  <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-800 p-6">
+                    <h3 className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-6">Filter Tests</h3>
+                    <div className="space-y-2">
+                      {sidebarFilters.map((filter) => (
+                        <button
+                          key={filter.name}
+                          onClick={() => setActiveFilter(filter.name)}
+                          className={`w-full flex items-center justify-between p-3 rounded-xl transition-all text-sm font-medium ${
+                            activeFilter === filter.name
+                              ? `${sectionConfig.color} text-white shadow-lg shadow-blue-500/20`
+                              : "text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800"
+                          }`}
+                        >
+                          <div className="flex items-center gap-3">
+                            {filter.name === "All Tests" ? <LayoutGrid className="h-4 w-4" /> : <sectionConfig.sidebarIcon className="h-4 w-4" />}
+                            {filter.name}
+                          </div>
+                          <span className={`px-2 py-0.5 rounded-full text-[10px] ${
+                            activeFilter === filter.name ? "bg-white/20 text-white" : "bg-slate-100 dark:bg-slate-800 text-slate-500"
+                          }`}>
+                            {filter.count}
+                          </span>
+                        </button>
+                      ))}
                     </div>
+                  </div>
 
-                    <div className="bg-gradient-to-br from-blue-600 to-violet-600 rounded-2xl p-6 text-white shadow-xl">
-                      <Sparkles className="h-8 w-8 mb-4 opacity-80" />
-                      <h4 className="font-bold text-lg mb-2">Need Help?</h4>
-                      <p className="text-sm text-white/80 mb-4">Our Gemini AI can help you analyze your mistakes and improve your score.</p>
+                  <div className="bg-gradient-to-br from-blue-600 to-violet-600 rounded-2xl p-6 text-white shadow-xl">
+                    <Sparkles className="h-8 w-8 mb-4 opacity-80" />
+                    <h4 className="font-bold text-lg mb-2">Need Help?</h4>
+                    <p className="text-sm text-white/80 mb-4">Our Gemini AI can help you analyze your mistakes and improve your score.</p>
+                    <Button 
+                      onClick={() => setIsAITutorOpen(true)}
+                      variant="secondary" 
+                      className="w-full rounded-xl bg-white text-blue-600 hover:bg-white/90 border-none font-bold"
+                    >
+                      Ask Gemini AI
+                    </Button>
+                  </div>
+                  
+                  {category?.toLowerCase() === "writing" && (
+                    <div className="p-6 bg-amber-50 dark:bg-amber-900/10 rounded-2xl border border-amber-200 dark:border-amber-900/30">
+                      <Zap className="h-6 w-6 text-amber-500 mb-2" />
+                      <h4 className="font-bold text-sm mb-1">Essay Checker</h4>
+                      <p className="text-xs text-slate-500 mb-4">Get instant band scores and corrections for your essays.</p>
                       <Button 
                         onClick={() => setIsAITutorOpen(true)}
-                        variant="secondary" 
-                        className="w-full rounded-xl bg-white text-blue-600 hover:bg-white/90 border-none font-bold"
+                        className="w-full bg-amber-500 hover:bg-amber-600 text-white text-xs"
                       >
-                        Ask Gemini AI
+                        Launch Checker
                       </Button>
                     </div>
-                  </aside>
-                )}
+                  )}
+                </aside>
 
                 {/* Main Content */}
                 <main className="flex-1">
-                  {sectionConfig.type === "standard" && (
+                  {(sectionConfig.type === "standard" || sectionConfig.type === "writing") && (
                     <div className="flex flex-col xl:flex-row xl:items-center justify-between mb-8 gap-4">
                       <div className="flex flex-col sm:flex-row gap-2">
                         {category?.toLowerCase() !== "books" && category?.toLowerCase() !== "vocabulary" && (
