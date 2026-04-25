@@ -1,37 +1,32 @@
-import { GoogleGenAI, ThinkingLevel } from "@google/genai";
+import OpenAI from "openai";
 
-const apiKey = process.env.GEMINI_API_KEY || "";
-const genAI = new GoogleGenAI({ apiKey });
+const apiKey = "sk-1e04b3c85d31417d88e732fd21364cb3";
+const openai = new OpenAI({ 
+  apiKey, 
+  baseURL: "https://api.deepseek.com",
+  dangerouslyAllowBrowser: true 
+});
 
-export const geminiModels = {
-  pro: "gemini-3.1-pro-preview",
-  flash: "gemini-3-flash-preview",
-  lite: "gemini-3.1-flash-lite-preview",
+export const aiModels = {
+  chat: "deepseek-chat",
+  reasoner: "deepseek-reasoner",
 };
 
-export async function analyzeContent(content: string, task: string, thinkingLevel?: ThinkingLevel) {
+export async function analyzeContent(content: string, task: string, useReasoner?: boolean) {
   try {
-    const response = await genAI.models.generateContent({
-      model: thinkingLevel ? geminiModels.pro : geminiModels.flash,
-      contents: [
-        {
-          parts: [
-            { text: `Task: ${task}\n\nContent:\n${content}` }
-          ]
-        }
+    const response = await openai.chat.completions.create({
+      model: useReasoner ? aiModels.reasoner : aiModels.chat,
+      messages: [
+        { role: "system", content: "You are a helpful assistant." },
+        { role: "user", content: `Task: ${task}\n\nContent:\n${content}` }
       ],
-      config: {
-        temperature: thinkingLevel ? undefined : 0.7,
-        topP: thinkingLevel ? undefined : 0.95,
-        topK: thinkingLevel ? undefined : 64,
-        thinkingConfig: thinkingLevel ? { thinkingLevel } : undefined,
-      }
+      temperature: useReasoner ? undefined : 0.7,
     });
 
-    return response.text;
+    return response.choices[0].message.content || "";
   } catch (error) {
-    console.error("Gemini AI Error:", error);
-    throw new Error("Failed to process content with Gemini AI.");
+    console.error("DeepSeek AI Error:", error);
+    throw new Error("Failed to process content with DeepSeek AI.");
   }
 }
 

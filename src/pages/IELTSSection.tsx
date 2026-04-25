@@ -542,7 +542,7 @@ export default function IELTSSection() {
                     onClick={() => setIsAITutorOpen(true)}
                     className="bg-[#8b5cf6] hover:bg-[#7c3aed] text-white rounded-lg h-10"
                   >
-                    <Bot className="h-4 w-4 mr-2" /> Gemini AI Essay Checker
+                    <Bot className="h-4 w-4 mr-2" /> DeepSeek AI Essay Checker
                   </Button>
                 </div>
               </div>
@@ -583,13 +583,13 @@ export default function IELTSSection() {
                     <div className="bg-gradient-to-br from-blue-600 to-violet-600 rounded-2xl p-6 text-white shadow-xl">
                       <Sparkles className="h-8 w-8 mb-4 opacity-80" />
                       <h4 className="font-bold text-lg mb-2">Need Help?</h4>
-                      <p className="text-sm text-white/80 mb-4">Our Gemini AI can help you analyze your mistakes and improve your score.</p>
+                      <p className="text-sm text-white/80 mb-4">Our DeepSeek AI can help you analyze your mistakes and improve your score.</p>
                       <Button 
                         onClick={() => setIsAITutorOpen(true)}
                         variant="secondary" 
                         className="w-full rounded-xl bg-white text-blue-600 hover:bg-white/90 border-none font-bold"
                       >
-                        Ask Gemini AI
+                        Ask DeepSeek AI
                       </Button>
                     </div>
                   </aside>
@@ -913,7 +913,7 @@ export default function IELTSSection() {
                             onClick={() => setIsAITutorOpen(true)}
                             className="rounded-xl bg-white/10 hover:bg-white/20 border-none text-white font-black text-xs h-10 px-4"
                           >
-                            <Bot className="h-4 w-4 mr-2" /> Gemini AI
+                            <Bot className="h-4 w-4 mr-2" /> DeepSeek AI
                           </Button>
                           <Button 
                             variant="secondary" 

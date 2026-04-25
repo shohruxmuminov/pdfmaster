@@ -1,4 +1,4 @@
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { useGemini } from "@/src/components/GeminiContext";
 import { Button } from "@/src/components/ui/button";
 import { ScheduleCalendar } from "@/src/components/ScheduleCalendar";
@@ -153,6 +153,7 @@ const ieltsSections = [
 
 export default function Home() {
   const { isGeminiEnabled, isPremium, expiryDate } = useGemini();
+  const navigate = useNavigate();
   const [isCalendarOpen, setIsCalendarOpen] = useState(false);
   const videoRef = useRef<HTMLVideoElement>(null);
 
@@ -295,7 +296,7 @@ export default function Home() {
                   Join thousands of students who achieved their target band score using our premium platform. Get personalized feedback instantly.
                 </p>
                 <Button 
-                  onClick={() => setIsModalOpen(true)}
+                  onClick={() => navigate("/pricing")}
                   className="bg-blue-600 hover:bg-blue-700 text-white rounded-full px-8 h-14 text-lg font-bold shadow-lg shadow-blue-600/20"
                 >
                   Get Premium Access
@@ -420,7 +421,7 @@ export default function Home() {
             Join IELTS.net today and get access to premium materials, AI tools, and a community of high achievers.
           </p>
           <Button 
-            onClick={() => setIsModalOpen(true)}
+            onClick={() => navigate("/pricing")}
             size="lg" 
             className="bg-white text-blue-600 hover:bg-slate-50 rounded-full h-16 px-12 text-xl font-black shadow-2xl hover:scale-105 transition-transform"
           >

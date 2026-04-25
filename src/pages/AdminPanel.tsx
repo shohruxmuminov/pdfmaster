@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect, useMemo } from "react";
 import { useGemini } from "@/src/components/GeminiContext";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/src/components/ui/card";
 import { Button } from "@/src/components/ui/button";
-import { Shield, Check, X, Clock, User, Lock, AlertCircle, Plus, Trash2, FileText, Upload, Eye, List, LogIn, Loader2, Download, Star, Search, ArrowUpDown, ChevronDown } from "lucide-react";
+import { Shield, Check, X, Clock, User, Lock, AlertCircle, Plus, Trash2, FileText, Upload, Eye, List, LogIn, Loader2, Download, Star, Search, ArrowUpDown, ChevronDown, Zap } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useNavigate } from "react-router-dom";
 import { INITIAL_MATERIALS } from "@/src/constants/initialMaterials";
@@ -477,6 +477,15 @@ export default function AdminPanel() {
                             className={`rounded-xl ${u.isBlocked ? 'text-red-600 bg-red-50' : 'text-slate-400'}`}
                           >
                             <Shield className="h-4 w-4 mr-2" /> {u.isBlocked ? "Unblock" : "Block User"}
+                          </Button>
+
+                          <Button 
+                            onClick={() => updateUserPremium(u.uid, true, 3650)}
+                            size="sm" 
+                            variant="outline"
+                            className="rounded-xl border-amber-200 text-amber-600 hover:bg-amber-50"
+                          >
+                            <Zap className="h-4 w-4 mr-2" /> Give Lifetime
                           </Button>
 
                           {u.role !== "admin" && (

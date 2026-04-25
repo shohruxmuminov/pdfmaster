@@ -3,7 +3,7 @@ import { Check, Send, Sparkles, Shield, Trophy } from "lucide-react";
 import { Button } from "@/src/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/src/components/ui/card";
 import { useGemini } from "@/src/components/GeminiContext";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 
 export default function Pricing() {
   const { isPremium } = useGemini();

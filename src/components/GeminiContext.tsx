@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from "react";
-import { GoogleGenAI, ThinkingLevel } from "@google/genai";
+import OpenAI from "openai";
 import { 
   ref, 
   uploadBytes, 
@@ -70,6 +70,8 @@ interface UserProfile {
   expiryDate: number | null;
   role: "user" | "admin" | "teacher";
   isBlocked?: boolean;
+  displayName?: string;
+  premiumStatus?: string;
 }
 
 interface GlobalSettings {
@@ -93,6 +95,7 @@ interface GeminiContextType {
   expiryDate: number | null;
   isBlocked: boolean;
   isMockTestEnabled: boolean;
+  premiumStatus?: string;
   toggleGemini: (enabled: boolean) => void;
   updateUserPremium: (userId: string, isPremium: boolean, expiryDays: number) => Promise<void>;
   materials: Material[];
@@ -103,8 +106,8 @@ interface GeminiContextType {
   submitResult: (result: Omit<UserResult, "id" | "timestamp" | "userId" | "userName">) => void;
   transcriptions: Transcription[];
   submitTranscription: (transcription: Omit<Transcription, "id" | "timestamp" | "userId">) => Promise<void>;
-  generateAIResponse: (prompt: string, systemInstruction?: string, thinkingLevel?: ThinkingLevel) => Promise<string>;
-  generateAIResponseStream: (prompt: string, systemInstruction?: string, thinkingLevel?: ThinkingLevel) => Promise<AsyncIterable<any>>;
+  generateAIResponse: (prompt: string, systemInstruction?: string, useReasoner?: boolean) => Promise<string>;
+  generateAIResponseStream: (prompt: string, systemInstruction?: string) => Promise<any>;
   analyzeSpeaking: (audioBase64: string, mimeType: string) => Promise<string>;
   transcribeAudio: (audioBase64: string, mimeType: string) => Promise<string>;
   setMockTestAccess: (enabled: boolean) => Promise<void>;
@@ -172,7 +175,7 @@ function handleFirestoreError(error: unknown, operationType: OperationType, path
 export function GeminiProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
-  const [isGeminiEnabled, setIsGeminiEnabled] = useState(false);
+  const [isGeminiEnabled, setIsGeminiEnabled] = useState(true);
   const [role, setRole] = useState<"user" | "admin" | "teacher">("user");
   const [expiryDate, setExpiryDate] = useState<number | null>(null);
   const [isBlocked, setIsBlocked] = useState(false);
@@ -603,7 +606,13 @@ export function GeminiProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  const generateAIResponse = async (prompt: string, systemInstruction?: string, thinkingLevel?: ThinkingLevel) => {
+  const openai = new OpenAI({ 
+    apiKey: "sk-1e04b3c85d31417d88e732fd21364cb3", 
+    baseURL: "https://api.deepseek.com",
+    dangerouslyAllowBrowser: true 
+  });
+
+  const generateAIResponse = async (prompt: string, systemInstruction?: string, useReasoner?: boolean) => {
     if (!isGeminiEnabled) {
       throw new Error("AI is not enabled. Please activate Premium Plus.");
     }
@@ -618,20 +627,16 @@ export function GeminiProvider({ children }: { children: React.ReactNode }) {
                              lowerPrompt.includes("rasm generate") ||
                              lowerPrompt.includes("rasm chiz");
 
-      const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
-      const response = await ai.models.generateContent({
-        model: thinkingLevel ? "gemini-3.1-pro-preview" : "gemini-2.0-flash",
-        contents: [{ parts: [{ text: prompt }] }],
-        config: {
-          systemInstruction: systemInstruction || "You are a helpful and versatile AI assistant. You can help with any topic, including IELTS, general knowledge, coding, creative writing, and more. If the user asks for an image, you can describe it and provide a markdown image link using https://pollinations.ai/p/[prompt-description]?width=1024&height=1024&seed=[random-number]. Ensure the prompt description is URL-encoded.",
-          temperature: thinkingLevel ? undefined : 0.7,
-          topP: thinkingLevel ? undefined : 0.95,
-          topK: thinkingLevel ? undefined : 40,
-          thinkingConfig: thinkingLevel ? { thinkingLevel } : undefined,
-        },
+      const response = await openai.chat.completions.create({
+        model: useReasoner ? "deepseek-reasoner" : "deepseek-chat",
+        messages: [
+          { role: "system", content: systemInstruction || "You are DeepSeek AI, a professional IELTS expert. Help students achieve high band scores with clear, accurate, and encouraging advice. If the user asks for an image, you can describe it and provide a markdown image link using https://pollinations.ai/p/[prompt-description]?width=1024&height=1024&seed=[random-number]. Ensure the prompt description is URL-encoded." },
+          { role: "user", content: prompt }
+        ],
+        temperature: useReasoner ? undefined : 0.7,
       });
 
-      let text = response.text || "I'm sorry, I couldn't generate a response.";
+      let text = response.choices[0].message.content || "I'm sorry, I couldn't generate a response.";
 
       if (isImageRequest) {
         const seed = Math.floor(Math.random() * 1000000);
@@ -642,7 +647,7 @@ export function GeminiProvider({ children }: { children: React.ReactNode }) {
 
       return text;
     } catch (error) {
-      console.error("Gemini API Error:", error);
+      console.error("DeepSeek API Error:", error);
       throw error;
     }
   };
@@ -652,16 +657,13 @@ export function GeminiProvider({ children }: { children: React.ReactNode }) {
       throw new Error("AI is not enabled. Please activate Premium Plus.");
     }
 
-    const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
-    return await ai.models.generateContentStream({
-      model: "gemini-2.0-flash",
-      contents: [{ parts: [{ text: prompt }] }],
-      config: {
-        systemInstruction: systemInstruction || "You are a helpful and versatile AI assistant. You can help with any topic, including IELTS, general knowledge, coding, creative writing, and more.",
-        temperature: 0.7,
-        topP: 0.95,
-        topK: 40,
-      },
+    return await openai.chat.completions.create({
+      model: "deepseek-chat",
+      messages: [
+        { role: "system", content: systemInstruction || "You are DeepSeek AI, a professional IELTS expert. Provide helpful guidance and use Markdown formatting." },
+        { role: "user", content: prompt }
+      ],
+      stream: true,
     });
   };
 
@@ -670,27 +672,9 @@ export function GeminiProvider({ children }: { children: React.ReactNode }) {
       throw new Error("AI is not enabled. Please activate Premium Plus.");
     }
 
-    const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
-    const response = await ai.models.generateContent({
-      model: "gemini-3-flash-preview",
-      contents: [
-        {
-          inlineData: {
-            data: audioBase64,
-            mimeType: mimeType
-          }
-        },
-        {
-          text: "Please analyze this IELTS speaking practice recording. Evaluate it based on the four official IELTS criteria: 1. Fluency and Coherence, 2. Lexical Resource, 3. Grammatical Range and Accuracy, 4. Pronunciation. For each criterion, provide a brief evaluation and specific examples from the recording. Also, provide an Estimated Band Score and 3-5 Actionable Tips for improvement. Format your response using Markdown with these exact headings: '## Fluency and Coherence', '## Lexical Resource', '## Grammatical Range and Accuracy', '## Pronunciation', '## Estimated Band Score', and '## Actionable Tips'."
-        }
-      ],
-      config: {
-        systemInstruction: "You are an expert IELTS Speaking Examiner. Provide detailed, professional, and constructive feedback based on official IELTS criteria.",
-        temperature: 0.4,
-      },
-    });
-
-    return response.text || "I'm sorry, I couldn't analyze the recording.";
+    // Since DeepSeek doesn't support direct audio input yet, we'll provide a placeholder message
+    // In a real scenario, you'd use a separate STT service then send the text to DeepSeek.
+    return "DeepSeek AI currently only supports text input. Audio analysis is temporarily unavailable during migration. Please use the transcribed text for analysis.";
   };
 
   const transcribeAudio = async (audioBase64: string, mimeType: string) => {
@@ -698,27 +682,7 @@ export function GeminiProvider({ children }: { children: React.ReactNode }) {
       throw new Error("AI is not enabled. Please activate Premium Plus.");
     }
 
-    const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
-    const response = await ai.models.generateContent({
-      model: "gemini-3-flash-preview",
-      contents: [
-        {
-          inlineData: {
-            data: audioBase64,
-            mimeType: mimeType
-          }
-        },
-        {
-          text: "Please transcribe the following audio exactly as spoken. Do not add any commentary or analysis. Just the plain text transcription."
-        }
-      ],
-      config: {
-        systemInstruction: "You are a highly accurate transcription assistant. Your goal is to provide a verbatim transcription of the provided audio.",
-        temperature: 0.1,
-      },
-    });
-
-    return response.text || "I'm sorry, I couldn't transcribe the recording.";
+    return "Audio transcription is temporarily unavailable as DeepSeek is a text-only model. Please use a separate transcription service.";
   };
 
   const setMockTestAccess = async (enabled: boolean) => {
