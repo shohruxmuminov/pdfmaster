@@ -188,17 +188,21 @@ export default function Auth() {
       if (errorCode === "auth/unauthorized-domain") {
         setError(`This domain (${currentDomain}) is not authorized in Firebase. Please add it to 'Authorized domains' in the Firebase Console.`);
         setShowTroubleshooting(true);
+      } else if (errorCode === "auth/operation-not-allowed") {
+        setError("Google sign-in is not enabled in your Firebase project. Please enable it in the Firebase Console under Authentication > Sign-in method.");
+        setShowTroubleshooting(true);
       } else if (errorCode === "auth/invalid-credential") {
         setError("Sign-in failed. This usually means the domain is not allowlisted or there's a Firebase config mismatch. Click 'Troubleshoot' below.");
         setShowTroubleshooting(true);
       } else if (errorCode === "auth/popup-blocked") {
-        setError("The sign-in popup was blocked. Please allow popups or open the app in a new tab.");
+        setError("The sign-in popup was blocked. This often happens in this preview environment. Please use the button below to open in a new tab for a secure sign-in.");
+        setShowTroubleshooting(true);
       } else if (errorCode === "auth/popup-closed-by-user") {
         setError("Sign-in popup was closed before completion. Please try again.");
       } else if (errorCode === "auth/cancelled-by-user") {
         setError("Sign-in was cancelled. Please try again.");
       } else {
-        setError("Google sign-in failed. Please try again or use email/password.");
+        setError(`Google sign-in failed: ${err.message || 'Please try again.'}`);
       }
     } finally {
       setLoading(false);
@@ -329,9 +333,19 @@ export default function Auth() {
             )}
 
             {error && (
-              <div className="mb-6 p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-xl text-red-600 dark:text-red-400 text-sm font-medium flex items-center gap-3">
-                <div className="w-2 h-2 bg-red-600 rounded-full animate-ping" />
-                {error}
+              <div className="mb-6 p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-xl text-red-600 dark:text-red-400 text-sm font-medium flex flex-col gap-3">
+                <div className="flex items-center gap-3">
+                  <div className="w-2 h-2 bg-red-600 rounded-full animate-ping" />
+                  {error}
+                </div>
+                {error.includes("popup was blocked") && (
+                  <Button 
+                    onClick={() => window.open(window.location.href, '_blank')}
+                    className="w-full bg-red-600 hover:bg-red-700 text-white font-bold h-10 rounded-lg text-xs"
+                  >
+                    Fix: Open in New Tab to Login
+                  </Button>
+                )}
               </div>
             )}
 

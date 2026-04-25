@@ -82,8 +82,8 @@ export default function AIPDFAssistant() {
     <div className="container mx-auto max-w-5xl py-12 px-4">
       {!extractedText ? (
         <ToolLayout
-          title="DeepSeek AI PDF Assistant"
-          description="Analyze, summarize, and translate your PDF documents with the power of DeepSeek AI."
+          title="Gemini AI PDF Assistant"
+          description="Analyze, summarize, and translate your PDF documents with the power of Gemini AI."
           accept={{ "application/pdf": [".pdf"] }}
           maxFiles={1}
           actionButtonText="Analyze PDF"
@@ -116,7 +116,7 @@ export default function AIPDFAssistant() {
             <Card className="lg:col-span-1 border-slate-200 dark:border-slate-800 bg-white/50 dark:bg-slate-900/50 backdrop-blur-sm">
               <CardHeader>
                 <CardTitle className="text-lg">AI Tasks</CardTitle>
-                <CardDescription>Select what you want DeepSeek to do</CardDescription>
+                <CardDescription>Select what you want Gemini to do</CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
                 <Button 
@@ -166,7 +166,7 @@ export default function AIPDFAssistant() {
                     {isAiProcessing ? (
                       <>
                         <Loader2 className="h-5 w-5 animate-spin text-blue-600" />
-                        DeepSeek is thinking...
+                        Gemini is thinking...
                       </>
                     ) : aiResult ? (
                       <>
@@ -192,7 +192,7 @@ export default function AIPDFAssistant() {
                       <div className="h-4 bg-slate-100 dark:bg-slate-800 rounded-full animate-pulse w-full" />
                       <div className="h-4 bg-slate-100 dark:bg-slate-800 rounded-full animate-pulse w-5/6" />
                     </div>
-                    <p className="text-sm font-medium animate-pulse">Processing your document with DeepSeek AI...</p>
+                    <p className="text-sm font-medium animate-pulse">Processing your document with Gemini AI...</p>
                   </div>
                 ) : aiResult ? (
                   <div className="prose dark:prose-invert max-w-none whitespace-pre-wrap text-slate-700 dark:text-slate-300 leading-relaxed">
@@ -202,7 +202,7 @@ export default function AIPDFAssistant() {
                   <div className="h-full flex flex-col items-center justify-center text-slate-400 space-y-4">
                     <Sparkles className="h-16 w-16 opacity-20" />
                     <p className="text-center max-w-xs">
-                      DeepSeek AI will analyze your document's text and provide insights here.
+                      Gemini AI will analyze your document's text and provide insights here.
                     </p>
                   </div>
                 )}

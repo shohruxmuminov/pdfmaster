@@ -168,14 +168,14 @@ export default function PDFToWord() {
       fullHtml += pageHtml;
     }
 
-    // If DeepSeek is enabled, we can use it to generate a cleaner Word-compatible HTML
+    // If Gemini is enabled, we can use it to generate a cleaner Word-compatible HTML
     if (isGeminiEnabled) {
       setIsGeminiProcessing(true);
       try {
         const cleanedText = await analyzeContent(fullText, "Convert this extracted PDF text into a clean, well-structured HTML document that preserves the original layout, headings, and paragraphs. Use standard HTML tags like <h1>, <p>, <ul>, etc. Return ONLY the HTML body content.");
         fullHtml = cleanedText || fullHtml;
       } catch (e) {
-        console.error("DeepSeek Word conversion failed:", e);
+        console.error("Gemini Word conversion failed:", e);
       } finally {
         setIsGeminiProcessing(false);
       }
@@ -209,10 +209,10 @@ export default function PDFToWord() {
     <div className="space-y-8">
       <ToolLayout
         title="PDF to Word"
-        description={isGeminiEnabled ? "AI-Powered Word Conversion. DeepSeek AI will reconstruct your document for maximum fidelity." : "Extract text from your PDF files and download as a Word document (.doc)."}
+        description={isGeminiEnabled ? "AI-Powered Word Conversion. Gemini AI will reconstruct your document for maximum fidelity." : "Extract text from your PDF files and download as a Word document (.doc)."}
         accept={{ "application/pdf": [".pdf"] }}
         maxFiles={1}
-        actionButtonText={isGeminiProcessing ? "DeepSeek is reconstructing..." : "Convert to Word"}
+        actionButtonText={isGeminiProcessing ? "Gemini is reconstructing..." : "Convert to Word"}
         onProcess={handleConvert}
       />
 
@@ -220,7 +220,7 @@ export default function PDFToWord() {
         <div className="container mx-auto max-w-4xl px-4">
           <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-100 dark:border-blue-800 rounded-2xl p-6 flex items-center gap-4 animate-pulse">
             <Loader2 className="h-6 w-6 text-blue-600 animate-spin" />
-            <p className="text-blue-700 dark:text-blue-300 font-medium">DeepSeek AI is reconstructing your Word document for perfect formatting...</p>
+            <p className="text-blue-700 dark:text-blue-300 font-medium">Gemini AI is reconstructing your Word document for perfect formatting...</p>
           </div>
         </div>
       )}

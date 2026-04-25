@@ -26,8 +26,8 @@ export function AITutorModal({ isOpen, onClose, initialContext }: AITutorModalPr
   useEffect(() => {
     if (isOpen && messages.length === 0) {
       const welcomeMessage = initialContext 
-        ? `Hello! I'm DeepSeek AI. I see you're practicing ${initialContext}. How can I help you today?`
-        : "Hello! I'm DeepSeek AI. How can I help you with your IELTS preparation today?";
+        ? `Hello! I'm Gemini AI. I see you're practicing ${initialContext}, but you can ask me anything—from IELTS tips to general knowledge, coding, or even just to chat. How can I help you today?`
+        : "Hello! I'm Gemini AI. I'm your versatile assistant for IELTS preparation and all your other questions. How can I help you today?";
       
       setMessages([{ role: "assistant", content: welcomeMessage }]);
     }
@@ -52,16 +52,15 @@ export function AITutorModal({ isOpen, onClose, initialContext }: AITutorModalPr
     setMessages(prev => [...prev, { role: "assistant", content: "" }]);
 
     try {
-      const systemInstruction = `You are DeepSeek AI, a professional IELTS expert on the IELTS.net platform. 
-      Your goal is to help students achieve Band 8+ scores. 
-      Be encouraging, precise, and provide actionable feedback. 
-      The student is currently practicing: ${initialContext || "IELTS"}. 
-      Tailor your advice specifically to this skill area. If they ask about other skills, provide brief advice but steer them back to ${initialContext || "IELTS"}.
-      Keep responses concise but comprehensive. Use Markdown for formatting (bolding, lists, etc.) to make advice clear.`;
+      const systemInstruction = `You are Gemini AI, a helpful and versatile AI assistant on the IELTS.net platform. 
+      While you are an expert in IELTS and can help students achieve Band 8+ scores, you are also a general-purpose AI capable of answering any worldly questions, coding, creative writing, and more.
+      Be encouraging, precise, and provide clear information. 
+      If the user is practicing ${initialContext || "IELTS"}, you can provide specific tips, but feel free to discuss any topic the user brings up.
+      Use Markdown for formatting to make your advice clear and professional.`;
 
       // Construct a more structured history for the prompt
-      const history = newMessages.map(m => `${m.role === "user" ? "Student" : "DeepSeek AI"}: ${m.content}`).join("\n");
-      const prompt = `${history}\nDeepSeek AI:`;
+      const history = newMessages.map(m => `${m.role === "user" ? "Student" : "Gemini AI"}: ${m.content}`).join("\n");
+      const prompt = `${history}\nGemini AI:`;
       
       const stream = await generateAIResponseStream(prompt, systemInstruction);
       
@@ -83,7 +82,7 @@ export function AITutorModal({ isOpen, onClose, initialContext }: AITutorModalPr
         const newMessages = [...prev];
         newMessages[newMessages.length - 1] = { 
           role: "assistant", 
-          content: "I'm sorry, I encountered an error. Please make sure your Premium Plus is active and your API key is correctly configured in the settings." 
+          content: "I'm sorry, I encountered an error. Please try again later or contact support if the issue persists." 
         };
         return newMessages;
       });
@@ -114,8 +113,8 @@ export function AITutorModal({ isOpen, onClose, initialContext }: AITutorModalPr
                   <Bot className="h-6 w-6" />
                 </div>
                 <div>
-                  <h3 className="font-bold text-lg">DeepSeek AI</h3>
-                  <p className="text-xs text-white/80">Powered by DeepSeek AI</p>
+                  <h3 className="font-bold text-lg">Gemini AI</h3>
+                  <p className="text-xs text-white/80">Powered by Google Gemini</p>
                 </div>
               </div>
               <button 
@@ -168,7 +167,7 @@ export function AITutorModal({ isOpen, onClose, initialContext }: AITutorModalPr
                     </div>
                     <div className="p-4 rounded-2xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 flex items-center gap-2">
                       <Loader2 className="h-4 w-4 animate-spin text-blue-600" />
-                      <span className="text-xs text-slate-500">DeepSeek is thinking...</span>
+                      <span className="text-xs text-slate-500">Gemini is thinking...</span>
                     </div>
                   </div>
                 </div>
@@ -183,7 +182,7 @@ export function AITutorModal({ isOpen, onClose, initialContext }: AITutorModalPr
                   value={input}
                   onChange={(e) => setInput(e.target.value)}
                   onKeyDown={(e) => e.key === "Enter" && handleSend()}
-                  placeholder="Ask DeepSeek AI anything..."
+                  placeholder="Ask Gemini AI anything..."
                   className="flex-1 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl px-5 py-3 pr-12 text-sm focus:ring-2 focus:ring-blue-500 outline-none transition-all"
                 />
                 <button

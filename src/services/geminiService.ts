@@ -1,32 +1,20 @@
-import OpenAI from "openai";
+import { GoogleGenerativeAI } from "@google/generative-ai";
 
-const apiKey = "sk-1e04b3c85d31417d88e732fd21364cb3";
-const openai = new OpenAI({ 
-  apiKey, 
-  baseURL: "https://api.deepseek.com",
-  dangerouslyAllowBrowser: true 
-});
+const apiKey = process.env.GEMINI_API_KEY || "";
+const genAI = new GoogleGenerativeAI(apiKey);
 
 export const aiModels = {
-  chat: "deepseek-chat",
-  reasoner: "deepseek-reasoner",
+  chat: "gemini-2.0-flash",
 };
 
-export async function analyzeContent(content: string, task: string, useReasoner?: boolean) {
+export async function analyzeContent(content: string, task: string) {
   try {
-    const response = await openai.chat.completions.create({
-      model: useReasoner ? aiModels.reasoner : aiModels.chat,
-      messages: [
-        { role: "system", content: "You are a helpful assistant." },
-        { role: "user", content: `Task: ${task}\n\nContent:\n${content}` }
-      ],
-      temperature: useReasoner ? undefined : 0.7,
-    });
-
-    return response.choices[0].message.content || "";
+    const model = genAI.getGenerativeModel({ model: aiModels.chat });
+    const result = await model.generateContent(`Task: ${task}\n\nContent:\n${content}`);
+    return result.response.text();
   } catch (error) {
-    console.error("DeepSeek AI Error:", error);
-    throw new Error("Failed to process content with DeepSeek AI.");
+    console.error("Gemini AI Error:", error);
+    throw new Error("Failed to process content with Gemini AI.");
   }
 }
 

@@ -2,204 +2,186 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
     // ===============================================================
-    // Assumed Data Model
+    // Global Safety Net
     // ===============================================================
-    //
-    // Collection: users
-    // Document ID: userId (auth.uid)
-    // Fields:
-    //   - uid: string (required) - The user's unique ID
-    //   - email: string (required) - The user's email address
-    //   - premiumStatus: string (required, enum: ['none', 'pending', 'approved']) - Premium access status
-    //   - expiryDate: number (optional) - Timestamp for premium expiration
-    //   - role: string (required, enum: ['user', 'admin']) - User role
-    //   - displayName: string (optional) - The user's display name
-    //   - createdAt: string (optional) - ISO date string
-    //
-    // Collection: requests
-    // Document ID: requestId (random)
-    // Fields:
-    //   - username: string (required) - The requester's username
-    //   - status: string (required, enum: ['pending', 'approved', 'rejected']) - Request status
-    //   - timestamp: number (required) - Request creation time
-    //   - expiryDate: number (optional) - Expiration time if approved
-    //   - uid: string (required) - The requester's UID
-    //
-    // Collection: materials
-    // Document ID: materialId (random)
-    // Fields:
-    //   - category: string (required, enum: ['Listening', 'Reading', 'Writing', 'Speaking', 'Books', 'Vocabulary', 'Mock Tests'])
-    //   - name: string (required)
-    //   - type: string (required)
-    //   - content: string (required)
-    //   - timestamp: number (required)
-    //
-    // Collection: results
-    // Document ID: resultId (random)
-    // Fields:
-    //   - firstName: string (required)
-    //   - lastName: string (required)
-    //   - telegramUsername: string (required)
-    //   - materialId: string (required)
-    //   - materialName: string (required)
-    //   - score: string (required)
-    //   - timestamp: number (required)
-    //
-    // Collection: transcriptions
-    // Document ID: transcriptionId (random)
-    // Fields:
-    //   - userId: string (required)
-    //   - userName: string (required)
-    //   - text: string (required)
-    //   - timestamp: number (required)
-    //   - audioUrl: string (optional)
-    //
-    // ===============================================================
+    match /{document=**} {
+      allow read, write: if false;
+    }
 
     // ===============================================================
     // Helper Functions
     // ===============================================================
-    function isAuthenticated() {
+    function isSignedIn() {
       return request.auth != null;
     }
 
     function isOwner(userId) {
-      return isAuthenticated() && request.auth.uid == userId;
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function getUserData(userId) {
+      return get(/databases/$(database)/documents/users/$(userId)).data;
     }
 
     function isAdmin() {
-      return isAuthenticated() &&
-        (request.auth.token.email == "shohruxmuminov201@gmail.com" && request.auth.token.email_verified == true ||
-         (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
-          get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin'));
+      return isSignedIn() && (
+        request.auth.token.email == "shohruxmuminov201@gmail.com" && request.auth.token.email_verified == true ||
+        (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && getUserData(request.auth.uid).role == "admin")
+      );
     }
 
     function isTeacher() {
-      return isAuthenticated() &&
-        (isAdmin() || 
-         (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
-          get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'teacher'));
+      return isSignedIn() && (
+        isAdmin() ||
+        (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && getUserData(request.auth.uid).role == "teacher")
+      );
     }
 
     function isValidEmail(email) {
-      return email is string && email.matches("^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$");
-    }
-
-    function hasOnlyAllowedFields(fields) {
-      return fields.hasAll(request.resource.data.keys());
+      return email is string && email.size() <= 256 && email.matches("^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$");
     }
 
     // ===============================================================
-    // Domain Validators
+    // Entity Validators (Blueprints)
     // ===============================================================
-    function isValidUser(data, userId) {
-      return hasOnlyAllowedFields(['uid', 'email', 'premiumStatus', 'expiryDate', 'role', 'displayName', 'createdAt', 'isBlocked', 'photoUrl']) &&
-             data.uid == userId &&
+
+    function isValidUserProfile(data) {
+      let allowedFields = [
+        'uid', 'email', 'premiumStatus', 'expiryDate', 'role', 
+        'displayName', 'createdAt', 'isBlocked', 'photoUrl', 'lastActive'
+      ];
+      return data.keys().hasAll(['uid', 'email']) &&
+             data.keys().size() <= allowedFields.size() &&
+             data.uid is string && data.uid.size() <= 128 &&
              isValidEmail(data.email) &&
-             data.premiumStatus in ['none', 'pending', 'approved'] &&
-             data.role in ['user', 'admin', 'teacher'] &&
-             (data.displayName is string || !('displayName' in data)) &&
-             (data.createdAt is string || !('createdAt' in data)) &&
-             (data.expiryDate is number || data.expiryDate == null || !('expiryDate' in data)) &&
-             (data.isBlocked is bool || !('isBlocked' in data));
+             (!('premiumStatus' in data) || data.premiumStatus in ['none', 'pending', 'approved']) &&
+             (!('role' in data) || data.role in ['user', 'admin', 'teacher']) &&
+             (!('displayName' in data) || (data.displayName is string && data.displayName.size() <= 100)) &&
+             (!('createdAt' in data) || data.createdAt is string) &&
+             (!('lastActive' in data) || data.lastActive is number) &&
+             (!('isBlocked' in data) || data.isBlocked is bool);
     }
 
     function isValidRequest(data) {
-      return hasOnlyAllowedFields(['username', 'status', 'timestamp', 'expiryDate', 'uid']) &&
-             data.username is string && data.username.size() > 0 &&
+      let allowedFields = ['username', 'status', 'timestamp', 'expiryDate', 'uid'];
+      return data.keys().hasAll(['username', 'status', 'timestamp', 'uid']) &&
+             data.keys().size() <= allowedFields.size() &&
+             data.username is string && data.username.size() <= 100 &&
              data.status in ['pending', 'approved', 'rejected'] &&
              data.timestamp is number &&
              data.uid is string;
     }
 
     function isValidMaterial(data) {
-      return hasOnlyAllowedFields(['category', 'subCategory', 'mockTestId', 'name', 'type', 'content', 'timestamp', 'isPremium']) &&
+      let allowedFields = ['category', 'subCategory', 'mockTestId', 'name', 'type', 'content', 'timestamp', 'isPremium'];
+      return data.keys().hasAll(['category', 'name', 'type', 'content', 'timestamp']) &&
+             data.keys().size() <= allowedFields.size() &&
              data.category in ['Listening', 'Reading', 'Writing', 'Speaking', 'Books', 'Vocabulary', 'Mock Tests'] &&
-             (!('subCategory' in data) || data.subCategory == null || data.subCategory in ['Listening', 'Reading', 'Writing', 'Speaking']) &&
-             (!('mockTestId' in data) || data.mockTestId == null || data.mockTestId is string) &&
-             data.name is string && data.name.size() > 0 &&
+             data.name is string && data.name.size() <= 200 &&
              data.type is string &&
-             data.content is string &&
-             (data.timestamp is number || data.timestamp is timestamp) &&
-             (!('isPremium' in data) || data.isPremium is bool);
+             data.content is string && data.content.size() <= 1048576 && // 1MB limit for Firestore fallback
+             (data.timestamp is number || data.timestamp is timestamp);
     }
 
     function isValidResult(data) {
-      return hasOnlyAllowedFields(['firstName', 'lastName', 'telegramUsername', 'materialId', 'materialName', 'score', 'timestamp', 'writingTask1', 'writingTask2']) &&
-             data.firstName is string && data.firstName.size() > 0 &&
-             data.lastName is string && data.lastName.size() > 0 &&
-             data.telegramUsername is string &&
+      let allowedFields = [
+        'firstName', 'lastName', 'telegramUsername', 'materialId', 
+        'materialName', 'score', 'timestamp', 'userId', 'userName',
+        'bandScore', 'aiFeedback', 'component', 'content', 'writingTask1', 'writingTask2'
+      ];
+      return data.keys().hasAll(['firstName', 'lastName', 'materialId', 'materialName', 'timestamp', 'userId']) &&
+             data.keys().size() <= allowedFields.size() &&
+             data.userId is string &&
+             data.firstName is string && data.firstName.size() <= 50 &&
+             data.lastName is string && data.lastName.size() <= 50 &&
              data.materialId is string &&
              data.materialName is string &&
-             data.score is string &&
-             (data.timestamp is number || data.timestamp is timestamp) &&
-             (!('writingTask1' in data) || data.writingTask1 is string) &&
-             (!('writingTask2' in data) || data.writingTask2 is string);
+             (data.timestamp is number || data.timestamp is timestamp);
     }
 
     function isValidTranscription(data) {
-      return hasOnlyAllowedFields(['userId', 'userName', 'text', 'timestamp', 'audioUrl']) &&
+      let allowedFields = ['userId', 'userName', 'text', 'timestamp', 'audioUrl'];
+      return data.keys().hasAll(['userId', 'userName', 'text', 'timestamp']) &&
+             data.keys().size() <= allowedFields.size() &&
              data.userId is string &&
-             data.userName is string &&
-             data.text is string && data.text.size() > 0 &&
-             data.timestamp is number &&
-             (!('audioUrl' in data) || data.audioUrl is string);
+             data.text is string && data.text.size() <= 10000 &&
+             data.timestamp is number;
     }
 
     function isValidAlert(data) {
-      return hasOnlyAllowedFields(['userId', 'userName', 'timestamp', 'type']) &&
+      let allowedFields = ['userId', 'userName', 'timestamp', 'type'];
+      return data.keys().hasAll(['userId', 'userName', 'timestamp', 'type']) &&
+             data.keys().size() <= allowedFields.size() &&
              data.userId is string &&
-             data.userName is string &&
              data.timestamp is number &&
              data.type == 'fullscreen_exit';
     }
 
     // ===============================================================
-    // Rules
+    // Collection Rules
     // ===============================================================
 
     match /users/{userId} {
       allow read: if isOwner(userId) || isTeacher();
-      allow create: if isAuthenticated() && isValidUser(request.resource.data, userId) && (request.resource.data.role == 'user' || isAdmin());
-      allow update: if isAuthenticated() && isValidUser(request.resource.data, userId) && (isOwner(userId) || isTeacher());
+      allow create: if isSignedIn() && isOwner(userId) && isValidUserProfile(incoming()) && 
+                    incoming().get('role', 'user') == 'user' &&
+                    incoming().get('premiumStatus', 'none') == 'none';
+      allow update: if isSignedIn() && (
+        (isOwner(userId) && isValidUserProfile(incoming()) && 
+         incoming().diff(existing()).affectedKeys().hasOnly(['displayName', 'photoUrl', 'lastActive'])) ||
+        (isTeacher() && isValidUserProfile(incoming()))
+      );
     }
 
     match /requests/{requestId} {
       allow read: if isTeacher();
-      allow create: if isAuthenticated() && isValidRequest(request.resource.data) && request.resource.data.uid == request.auth.uid;
-      allow update: if isTeacher() && isValidRequest(request.resource.data);
+      allow create: if isSignedIn() && isValidRequest(incoming()) && incoming().uid == request.auth.uid;
+      allow update: if isTeacher() && isValidRequest(incoming());
       allow delete: if isTeacher();
     }
 
     match /materials/{materialId} {
-      allow read: if isAuthenticated();
-      allow create, update: if isTeacher() && isValidMaterial(request.resource.data);
+      allow read: if isSignedIn();
+      allow create, update: if isTeacher() && isValidMaterial(incoming());
       allow delete: if isTeacher();
     }
 
     match /results/{resultId} {
-      allow read: if isTeacher();
-      allow create: if isAuthenticated() && isValidResult(request.resource.data);
-      allow update: if isTeacher() && isValidResult(request.resource.data);
-      allow delete: if isTeacher();
+      allow list: if isSignedIn() && (isTeacher() || resource.data.userId == request.auth.uid);
+      allow get: if isSignedIn() && (isTeacher() || resource.data.userId == request.auth.uid);
+      allow create: if isSignedIn() && isValidResult(incoming()) && incoming().userId == request.auth.uid;
+      allow update, delete: if isTeacher();
     }
 
     match /transcriptions/{transcriptionId} {
-      allow read: if isTeacher();
-      allow create: if isAuthenticated() && isValidTranscription(request.resource.data) && request.resource.data.userId == request.auth.uid;
-      allow update: if isTeacher() && isValidTranscription(request.resource.data);
-      allow delete: if isTeacher();
+      allow list: if isSignedIn() && (isTeacher() || resource.data.userId == request.auth.uid);
+      allow get: if isSignedIn() && (isTeacher() || resource.data.userId == request.auth.uid);
+      allow create: if isSignedIn() && isValidTranscription(incoming()) && incoming().userId == request.auth.uid;
+      allow update, delete: if isTeacher();
     }
 
     match /settings/{settingId} {
-      allow read: if isAuthenticated();
-      allow write: if isTeacher();
+      allow read: if isSignedIn();
+      allow write: if isAdmin();
     }
 
     match /alerts/{alertId} {
       allow read: if isTeacher();
-      allow create: if isAuthenticated() && isValidAlert(request.resource.data);
+      allow create: if isSignedIn() && isValidAlert(incoming()) && incoming().userId == request.auth.uid;
       allow delete: if isTeacher();
     }
   }
 }
+
