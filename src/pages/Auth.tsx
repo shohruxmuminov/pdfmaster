@@ -53,6 +53,32 @@ export default function Auth() {
     }
   };
 
+  const handleAuthError = (err: any, context: string) => {
+    console.error(`${context} error:`, err);
+    let errorMessage = err.message || "An unexpected error occurred.";
+    
+    const errorCode = err.code || (err.message && err.message.match(/\((auth\/[^)]+)\)/)?.[1]);
+    
+    if (errorCode === "auth/unauthorized-domain") {
+      errorMessage = `This domain (${currentDomain}) is not authorized in Firebase Console. Please add it to 'Authorized domains'.`;
+      setShowTroubleshooting(true);
+    } else if (errorCode === "auth/operation-not-allowed") {
+      errorMessage = `The ${context} sign-in method is not enabled in your Firebase project. Please enable it in Firebase Console under Authentication > Sign-in method.`;
+    } else if (errorCode === "auth/popup-blocked") {
+      errorMessage = "The sign-in popup was blocked by your browser. Please allow popups or open the app in a new tab.";
+    } else if (errorCode === "auth/invalid-credential") {
+      errorMessage = "Invalid credentials. Please check your inputs or try a different method.";
+    } else if (errorCode === "auth/too-many-requests") {
+      errorMessage = "Too many failed attempts. Please try again later or reset your password.";
+    } else if (errorCode === "auth/email-already-in-use") {
+      errorMessage = "This email is already registered.";
+    } else if (errorCode === "auth/user-not-found" || errorCode === "auth/wrong-password") {
+      errorMessage = "Invalid email or password.";
+    }
+    
+    setError(errorMessage);
+  };
+
   const handleAppleSignIn = async () => {
     setError("");
     setMessage("");
@@ -76,17 +102,7 @@ export default function Auth() {
       }
       navigate("/");
     } catch (err: any) {
-      console.error("Apple Auth error:", err);
-      const errorCode = err.code || (err.message && err.message.match(/\((auth\/[^)]+)\)/)?.[1]);
-      
-      if (errorCode === "auth/unauthorized-domain") {
-        setError(`This domain (${currentDomain}) is not authorized in Firebase. Please add it to 'Authorized domains' in the Firebase Console.`);
-        setShowTroubleshooting(true);
-      } else if (errorCode === "auth/popup-blocked") {
-        setError("Sign-in popup was blocked by your browser. Please allow popups for this site or open the app in a new tab.");
-      } else {
-        setError(`Apple sign-in failed: ${err.message || 'Please try again.'}`);
-      }
+      handleAuthError(err, "Apple sign-in");
     } finally {
       setLoading(false);
     }
@@ -109,16 +125,7 @@ export default function Auth() {
       setOtpSent(true);
       setMessage("Verification code sent to your phone!");
     } catch (err: any) {
-      console.error("Phone Auth error:", err);
-      const errorCode = err.code || (err.message && err.message.match(/\((auth\/[^)]+)\)/)?.[1]);
-      
-      if (errorCode === "auth/operation-not-allowed") {
-        setError("Phone Authentication is not enabled in your Firebase Console. Please enable it under Authentication > Sign-in method. Also, check the 'SMS Region Policy' to ensure your country is allowed.");
-        setShowTroubleshooting(true);
-      } else {
-        setError("Failed to send verification code. Make sure the phone number is in international format (e.g., +1234567890).");
-      }
-      
+      handleAuthError(err, "Phone sign-in");
       if ((window as any).recaptchaVerifier) {
         (window as any).recaptchaVerifier.clear();
         (window as any).recaptchaVerifier = null;
@@ -151,8 +158,7 @@ export default function Auth() {
       }
       navigate("/");
     } catch (err: any) {
-      console.error("Verification error:", err);
-      setError("Invalid verification code. Please try again.");
+      handleAuthError(err, "Verification");
     } finally {
       setLoading(false);
     }
@@ -167,7 +173,6 @@ export default function Auth() {
       const result = await signInWithPopup(auth, provider);
       const user = result.user;
       
-      // Check if user profile exists
       const userDoc = await getDoc(doc(db, "users", user.uid));
       if (!userDoc.exists()) {
         const isAdmin = user.email === "shohruxmuminov201@gmail.com";
@@ -182,28 +187,7 @@ export default function Auth() {
       }
       navigate("/");
     } catch (err: any) {
-      console.error("Google Auth error:", err);
-      const errorCode = err.code || (err.message && err.message.match(/\((auth\/[^)]+)\)/)?.[1]);
-      
-      if (errorCode === "auth/unauthorized-domain") {
-        setError(`This domain (${currentDomain}) is not authorized in Firebase. Please add it to 'Authorized domains' in the Firebase Console.`);
-        setShowTroubleshooting(true);
-      } else if (errorCode === "auth/operation-not-allowed") {
-        setError("Google sign-in is not enabled in your Firebase project. Please enable it in the Firebase Console under Authentication > Sign-in method.");
-        setShowTroubleshooting(true);
-      } else if (errorCode === "auth/invalid-credential") {
-        setError("Sign-in failed. This usually means the domain is not allowlisted or there's a Firebase config mismatch. Click 'Troubleshoot' below.");
-        setShowTroubleshooting(true);
-      } else if (errorCode === "auth/popup-blocked") {
-        setError("The sign-in popup was blocked. This often happens in this preview environment. Please use the button below to open in a new tab for a secure sign-in.");
-        setShowTroubleshooting(true);
-      } else if (errorCode === "auth/popup-closed-by-user") {
-        setError("Sign-in popup was closed before completion. Please try again.");
-      } else if (errorCode === "auth/cancelled-by-user") {
-        setError("Sign-in was cancelled. Please try again.");
-      } else {
-        setError(`Google sign-in failed: ${err.message || 'Please try again.'}`);
-      }
+      handleAuthError(err, "Google sign-in");
     } finally {
       setLoading(false);
     }

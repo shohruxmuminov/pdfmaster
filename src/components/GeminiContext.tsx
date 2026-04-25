@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from "react";
-import { GoogleGenAI } from "@google/genai";
+import { GoogleGenerativeAI } from "@google/generative-ai";
 import { 
   ref, 
   uploadBytes, 
@@ -606,7 +606,7 @@ export function GeminiProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  const genAI = React.useMemo(() => new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || "" }), []);
+  const genAI = React.useMemo(() => new GoogleGenerativeAI(process.env.GEMINI_API_KEY || ""), []);
 
   const generateAIResponse = async (prompt: string, systemInstruction?: string) => {
     if (!isGeminiEnabled) {
@@ -623,13 +623,13 @@ export function GeminiProvider({ children }: { children: React.ReactNode }) {
                            lowerPrompt.includes("rasm chiz");
 
     try {
-      const response = await genAI.models.generateContent({
-        model: "gemini-3-flash-preview",
-        contents: prompt,
-        config: systemInstruction ? { systemInstruction } : undefined
+      const model = genAI.getGenerativeModel({
+        model: "gemini-1.5-flash",
+        systemInstruction
       });
-
-      let text = response.text || "I'm sorry, I couldn't generate a response.";
+      const result = await model.generateContent(prompt);
+      const response = await result.response;
+      let text = response.text() || "I'm sorry, I couldn't generate a response.";
 
       if (isImageRequest) {
         const seed = Math.floor(Math.random() * 1000000);
@@ -651,16 +651,16 @@ export function GeminiProvider({ children }: { children: React.ReactNode }) {
     }
 
     try {
-      const response = await genAI.models.generateContentStream({
-        model: "gemini-3-flash-preview",
-        contents: prompt,
-        config: systemInstruction ? { systemInstruction } : undefined
+      const model = genAI.getGenerativeModel({
+        model: "gemini-1.5-flash",
+        systemInstruction
       });
+      const result = await model.generateContentStream(prompt);
       
       // Create an async generator that matches what AITutorModal expects (chunk.text)
       async function* geminiStream() {
-        for await (const chunk of response) {
-          const text = chunk.text;
+        for await (const chunk of result.stream) {
+          const text = chunk.text();
           yield { text };
         }
       }
@@ -678,23 +678,23 @@ export function GeminiProvider({ children }: { children: React.ReactNode }) {
     }
 
     try {
-      const response = await genAI.models.generateContent({
-        model: "gemini-3-flash-preview",
-        contents: [
-          {
-            inlineData: {
-              data: audioBase64,
-              mimeType: mimeType
-            }
-          },
-          { text: "Analyze this IELTS Speaking attempt." }
-        ],
-        config: {
-          systemInstruction: "You are an expert IELTS Speaking examiner. Analyze the provided audio and give feedback based on: Fluency and Coherence, Lexical Resource, Grammatical Range and Accuracy, and Pronunciation. Provide a band score estimate and clear tips for improvement."
-        }
+      const model = genAI.getGenerativeModel({
+        model: "gemini-1.5-flash",
+        systemInstruction: "You are an expert IELTS Speaking examiner. Analyze the provided audio and give feedback based on: Fluency and Coherence, Lexical Resource, Grammatical Range and Accuracy, and Pronunciation. Provide a band score estimate and clear tips for improvement."
       });
 
-      return response.text || "I encountered an error while analyzing your speaking.";
+      const result = await model.generateContent([
+        {
+          inlineData: {
+            data: audioBase64,
+            mimeType: mimeType
+          }
+        },
+        { text: "Analyze this IELTS Speaking attempt." }
+      ]);
+      const response = await result.response;
+
+      return response.text() || "I encountered an error while analyzing your speaking.";
     } catch (error) {
       console.error("Gemini Speaking Analysis Error:", error);
       return "I encountered an error while analyzing your speaking. Please try again or check your internet connection.";
@@ -707,20 +707,21 @@ export function GeminiProvider({ children }: { children: React.ReactNode }) {
     }
 
     try {
-      const response = await genAI.models.generateContent({
-        model: "gemini-3-flash-preview",
-        contents: [
-          {
-            inlineData: {
-              data: audioBase64,
-              mimeType: mimeType
-            }
-          },
-          { text: "Transcribe this audio exactly as spoken. Do not add any commentary." }
-        ]
+      const model = genAI.getGenerativeModel({
+        model: "gemini-1.5-flash"
       });
+      const result = await model.generateContent([
+        {
+          inlineData: {
+            data: audioBase64,
+            mimeType: mimeType
+          }
+        },
+        { text: "Transcribe this audio exactly as spoken. Do not add any commentary." }
+      ]);
+      const response = await result.response;
 
-      return response.text || "Transcription failed.";
+      return response.text() || "Transcription failed.";
     } catch (error) {
       console.error("Gemini Transcription Error:", error);
       return "Transcription failed.";
