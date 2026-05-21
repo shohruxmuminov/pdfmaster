@@ -17,7 +17,10 @@ import {
   FileText,
   ChevronRight,
   UserCheck,
-  MoreVertical
+  MoreVertical,
+  Mic2,
+  Trash2,
+  Check
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 
@@ -29,6 +32,9 @@ export default function TeacherPanel() {
     cheatAlerts, 
     results, 
     transcriptions,
+    speakingMocks,
+    gradeSpeakingMockResult,
+    deleteSpeakingMockResult,
     isMockTestEnabled, 
     setMockTestAccess, 
     blockUser,
@@ -36,8 +42,12 @@ export default function TeacherPanel() {
   } = useGemini();
   const [accessCode, setAccessCode] = useState("");
   const [isAuthorized, setIsAuthorized] = useState(false);
-  const [activeTab, setActiveTab] = useState<"overview" | "users" | "alerts" | "results" | "transcriptions">("overview");
+  const [activeTab, setActiveTab] = useState<"overview" | "users" | "alerts" | "results" | "transcriptions" | "speaking_mocks">("overview");
   const [searchQuery, setSearchQuery] = useState("");
+  
+  const [gradingMockId, setGradingMockId] = useState<string | null>(null);
+  const [mockScore, setMockScore] = useState<number | "">("");
+  const [mockFeedback, setMockFeedback] = useState("");
 
   useEffect(() => {
     if (role === "teacher" || role === "admin") {
@@ -127,6 +137,7 @@ export default function TeacherPanel() {
               { id: "users", label: "Students", icon: Users },
               { id: "alerts", label: "Exam Alerts", icon: Bell, count: cheatAlerts.length },
               { id: "results", label: "Test Results", icon: Trophy },
+              { id: "speaking_mocks", label: "Speaking Mocks", icon: Mic2, count: 0 },
               { id: "transcriptions", label: "Transcriptions", icon: FileText }
             ].map((tab) => (
               <button
@@ -539,6 +550,192 @@ export default function TeacherPanel() {
                       <div className="p-6 bg-slate-50 dark:bg-slate-800/50 rounded-2xl border border-slate-100 dark:border-slate-800 italic text-slate-700 dark:text-slate-300 leading-relaxed">
                         "{t.text}"
                       </div>
+                    </motion.div>
+                  ))
+                )}
+              </motion.div>
+            )}
+
+            {activeTab === "speaking_mocks" && (
+              <motion.div 
+                key="speaking_mocks"
+                initial={{ opacity: 0, x: 20 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: -20 }}
+                className="space-y-6"
+              >
+                {speakingMocks.length === 0 ? (
+                  <div className="text-center py-32 bg-white dark:bg-slate-900 rounded-[3rem] border-2 border-dashed border-slate-200 dark:border-slate-800">
+                    <Mic2 className="h-16 w-16 text-slate-200 mx-auto mb-6" />
+                    <h3 className="text-2xl font-black text-slate-900 dark:text-white mb-2">No Speaking Mocks</h3>
+                    <p className="text-slate-500 font-medium">Recorded speaking answers will appear here.</p>
+                  </div>
+                ) : (
+                  speakingMocks.sort((a, b) => b.timestamp - a.timestamp).map((sm) => (
+                    <motion.div 
+                      layout
+                      key={sm.id!}
+                      className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-[2rem] p-8 shadow-xl"
+                    >
+                      <div className="flex items-center justify-between mb-6">
+                        <div className="flex items-center gap-4">
+                          <div className="w-12 h-12 bg-blue-100 dark:bg-blue-900/30 rounded-2xl flex items-center justify-center">
+                            <Mic2 className="h-6 w-6 text-blue-600" />
+                          </div>
+                          <div>
+                            <h3 className="text-xl font-black text-slate-900 dark:text-white">
+                              {sm.studentFirstName} {sm.studentLastName}
+                            </h3>
+                            <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">
+                              {new Date(sm.timestamp).toLocaleString()} • 
+                              <span className={sm.status === 'In Progress' ? 'ml-1 text-amber-500 font-medium' : sm.status === 'Pending' ? 'ml-1 text-blue-500 font-medium' : 'ml-1 text-emerald-500 font-medium'}>
+                                {sm.status}
+                              </span>
+                            </p>
+                          </div>
+                        </div>
+                        <div className="flex gap-2">
+                          <Button 
+                            variant="ghost" 
+                            size="sm" 
+                            onClick={() => deleteSpeakingMockResult(sm.id!)}
+                            className="text-red-500 hover:text-red-600 hover:bg-red-50"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </div>
+
+                      {/* Audios */}
+                      <div className="grid md:grid-cols-2 gap-4 mb-6">
+                        {sm.audioUrls.part1_1 && (
+                          <div className="p-4 bg-slate-50 dark:bg-slate-800/50 rounded-2xl">
+                            <h4 className="text-xs font-bold uppercase tracking-widest text-slate-400 mb-2">Part 1.1</h4>
+                            <audio controls src={sm.audioUrls.part1_1} className="w-full h-10" />
+                          </div>
+                        )}
+                        {sm.audioUrls.part1_2 && (
+                          <div className="p-4 bg-slate-50 dark:bg-slate-800/50 rounded-2xl">
+                            <h4 className="text-xs font-bold uppercase tracking-widest text-slate-400 mb-2">Part 1.2</h4>
+                            <audio controls src={sm.audioUrls.part1_2} className="w-full h-10" />
+                          </div>
+                        )}
+                        {sm.audioUrls.part2 && (
+                          <div className="p-4 bg-slate-50 dark:bg-slate-800/50 rounded-2xl">
+                            <h4 className="text-xs font-bold uppercase tracking-widest text-slate-400 mb-2">Part 2</h4>
+                            <audio controls src={sm.audioUrls.part2} className="w-full h-10" />
+                          </div>
+                        )}
+                        {sm.audioUrls.part3 && (
+                          <div className="p-4 bg-slate-50 dark:bg-slate-800/50 rounded-2xl">
+                            <h4 className="text-xs font-bold uppercase tracking-widest text-slate-400 mb-2">Part 3</h4>
+                            <audio controls src={sm.audioUrls.part3} className="w-full h-10" />
+                          </div>
+                        )}
+                      </div>
+
+                      {sm.questionsData && (
+                        <div className="mb-6">
+                           <details className="p-4 bg-slate-50 dark:bg-slate-800/50 rounded-2xl border border-slate-100 dark:border-slate-800 group">
+                              <summary className="font-bold text-sm cursor-pointer hover:text-emerald-500 list-none flex items-center justify-between">
+                                 View Associated Questions
+                                 <ChevronRight className="h-4 w-4 transition-transform group-open:rotate-90" />
+                              </summary>
+                              <div className="mt-4 space-y-4 text-sm text-slate-600 dark:text-slate-400">
+                                 <div>
+                                   <strong className="text-emerald-600 block mb-1">Part 1.1 - {sm.questionsData.part1_1.topic}</strong>
+                                   <ul className="list-disc ml-5 space-y-1">
+                                     {sm.questionsData.part1_1.questions.map((q: any, i: number) => <li key={i}>{q}</li>)}
+                                   </ul>
+                                 </div>
+                                 <div className="border-t border-slate-200 dark:border-slate-700 pt-4">
+                                   <strong className="text-emerald-600 block mb-1">Part 1.2 - {sm.questionsData.part1_2.topic}</strong>
+                                   <ul className="list-disc ml-5 space-y-1">
+                                     {sm.questionsData.part1_2.questions.map((q: any, i: number) => <li key={i}>{q}</li>)}
+                                   </ul>
+                                 </div>
+                                 <div className="border-t border-slate-200 dark:border-slate-700 pt-4">
+                                   <strong className="text-emerald-600 block mb-1">Part 2 - {sm.questionsData.part2.topic}</strong>
+                                   <p className="whitespace-pre-wrap">{sm.questionsData.part2.cueCard}</p>
+                                 </div>
+                                 <div className="border-t border-slate-200 dark:border-slate-700 pt-4">
+                                   <strong className="text-emerald-600 block mb-1">Part 3</strong>
+                                   <p className="font-medium mb-2">{sm.questionsData.part3.question}</p>
+                                   <div className="grid grid-cols-2 gap-4">
+                                     <div>
+                                        <strong className="text-emerald-500">For:</strong>
+                                        <ul className="list-disc ml-5 space-y-1">
+                                           {sm.questionsData.part3.argumentsFor.map((q: any, i: number) => <li key={i}>{q}</li>)}
+                                        </ul>
+                                     </div>
+                                     <div>
+                                        <strong className="text-red-500">Against:</strong>
+                                        <ul className="list-disc ml-5 space-y-1">
+                                           {sm.questionsData.part3.argumentsAgainst.map((q: any, i: number) => <li key={i}>{q}</li>)}
+                                        </ul>
+                                     </div>
+                                   </div>
+                                 </div>
+                              </div>
+                           </details>
+                        </div>
+                      )}
+
+                      {sm.status === "Pending" && gradingMockId !== sm.id && (
+                        <Button 
+                          onClick={() => {
+                            setGradingMockId(sm.id!);
+                            setMockScore(sm.score || "");
+                            setMockFeedback(sm.feedback || "");
+                          }}
+                          className="w-full bg-blue-600 hover:bg-blue-700 text-white rounded-xl h-12"
+                        >
+                          Grade Student
+                        </Button>
+                      )}
+
+                      {(sm.status === "Graded" || gradingMockId === sm.id) && (
+                        <div className="mt-6 p-6 border border-slate-200 dark:border-slate-800 rounded-2xl space-y-4 bg-slate-50 dark:bg-slate-800/20">
+                          <div>
+                            <label className="text-xs font-bold uppercase tracking-widest text-slate-400 mb-1 block">Score (Max 75)</label>
+                            <input
+                              type="number"
+                              disabled={sm.status === "Graded"}
+                              value={gradingMockId === sm.id ? mockScore : sm.score || ""}
+                              onChange={e => setMockScore(Number(e.target.value))}
+                              max={75}
+                              className="w-full max-w-[100px] h-12 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl px-4 font-black"
+                            />
+                          </div>
+                          <div>
+                            <label className="text-xs font-bold uppercase tracking-widest text-slate-400 mb-1 block">Feedback</label>
+                            <textarea
+                              disabled={sm.status === "Graded"}
+                              value={gradingMockId === sm.id ? mockFeedback : sm.feedback || ""}
+                              onChange={e => setMockFeedback(e.target.value)}
+                              className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl p-4 min-h-[100px]"
+                              placeholder="Provide feedback here..."
+                            />
+                          </div>
+                          
+                          {gradingMockId === sm.id && (
+                            <div className="flex gap-2 justify-end">
+                              <Button variant="ghost" onClick={() => setGradingMockId(null)}>Cancel</Button>
+                              <Button 
+                                onClick={async () => {
+                                  if (mockScore === "" || !mockFeedback) return alert("Fill all fields");
+                                  await gradeSpeakingMockResult(sm.id!, Number(mockScore), mockFeedback);
+                                  setGradingMockId(null);
+                                }}
+                                className="bg-emerald-500 hover:bg-emerald-600 text-white"
+                              >
+                                Save Grade
+                              </Button>
+                            </div>
+                          )}
+                        </div>
+                      )}
+
                     </motion.div>
                   ))
                 )}

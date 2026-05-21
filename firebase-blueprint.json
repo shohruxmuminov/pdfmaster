@@ -90,6 +90,25 @@
         "type": { "type": "string", "enum": ["fullscreen_exit"] }
       },
       "required": ["userId", "userName", "timestamp", "type"]
+    },
+    "SpeakingMockResult": {
+      "title": "Speaking Mock Result",
+      "description": "Stored multilevel speaking mock results and grading.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "studentFirstName": { "type": "string" },
+        "studentLastName": { "type": "string" },
+        "teacherName": { "type": "string" },
+        "mockId": { "type": "string" },
+        "userId": { "type": "string" },
+        "audioUrls": { "type": "object" },
+        "score": { "type": "number" },
+        "feedback": { "type": "string" },
+        "status": { "type": "string", "enum": ["In Progress", "Pending", "Graded"] },
+        "timestamp": { "type": "number" }
+      },
+      "required": ["id", "studentFirstName", "studentLastName", "mockId", "userId", "audioUrls", "status", "timestamp"]
     }
   },
   "firestore": {
@@ -120,6 +139,10 @@
     "/alerts/{alertId}": {
       "schema": "CheatAlert",
       "description": "Cheat alerts."
+    },
+    "/speaking_mocks/{mockId}": {
+      "schema": "SpeakingMockResult",
+      "description": "Speaking Mock tests results."
     }
   }
 }

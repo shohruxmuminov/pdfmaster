@@ -37,7 +37,7 @@ service cloud.firestore {
 
     function isAdmin() {
       return isSignedIn() && (
-        request.auth.token.email == "shohruxmuminov201@gmail.com" && request.auth.token.email_verified == true ||
+        ('email' in request.auth.token && request.auth.token.email.toLowerCase() == "shohruxmuminov201@gmail.com") ||
         (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && getUserData(request.auth.uid).role == "admin")
       );
     }
@@ -50,7 +50,7 @@ service cloud.firestore {
     }
 
     function isValidEmail(email) {
-      return email is string && email.size() <= 256 && email.matches("^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$");
+      return email is string && email.size() >= 3 && email.size() <= 256 && email.matches(".+@.+");
     }
 
     // ===============================================================
@@ -85,10 +85,14 @@ service cloud.firestore {
     }
 
     function isValidMaterial(data) {
-      let allowedFields = ['category', 'subCategory', 'mockTestId', 'name', 'type', 'content', 'timestamp', 'isPremium'];
+      let allowedFields = [
+        'category', 'subCategory', 'mockTestId', 'name', 'type', 
+        'content', 'timestamp', 'isPremium', 'audioUrl', 'thumbnail', 
+        'subtitles', 'examType'
+      ];
       return data.keys().hasAll(['category', 'name', 'type', 'content', 'timestamp']) &&
              data.keys().size() <= allowedFields.size() &&
-             data.category in ['Listening', 'Reading', 'Writing', 'Speaking', 'Books', 'Vocabulary', 'Mock Tests'] &&
+             data.category in ['Listening', 'Reading', 'Writing', 'Speaking', 'Books', 'Vocabulary', 'Mock Tests', 'English Movies', 'Dashboard Video'] &&
              data.name is string && data.name.size() <= 200 &&
              data.type is string &&
              data.content is string && data.content.size() <= 1048576 && // 1MB limit for Firestore fallback
@@ -129,18 +133,31 @@ service cloud.firestore {
              data.type == 'fullscreen_exit';
     }
 
+    function isValidSpeakingMockResult(data) {
+      let allowedFields = ['studentFirstName', 'studentLastName', 'teacherName', 'mockId', 'userId', 'audioUrls', 'score', 'feedback', 'status', 'timestamp', 'questionsData'];
+      return data.keys().hasAll(['studentFirstName', 'studentLastName', 'mockId', 'userId', 'audioUrls', 'status', 'timestamp']) &&
+             data.keys().size() <= allowedFields.size() &&
+             data.userId is string &&
+             data.studentFirstName is string &&
+             data.studentLastName is string &&
+             data.mockId is string &&
+             data.status in ['In Progress', 'Pending', 'Graded'] &&
+             data.timestamp is number;
+    }
+
     // ===============================================================
     // Collection Rules
     // ===============================================================
 
     match /users/{userId} {
       allow read: if isOwner(userId) || isTeacher();
-      allow create: if isSignedIn() && isOwner(userId) && isValidUserProfile(incoming()) && 
-                    incoming().get('role', 'user') == 'user' &&
-                    incoming().get('premiumStatus', 'none') == 'none';
+      allow create: if isSignedIn() && isOwner(userId) && isValidUserProfile(incoming()) && (
+        (incoming().get('role', 'user') == 'user' && incoming().get('premiumStatus', 'none') == 'none') ||
+        isAdmin()
+      );
       allow update: if isSignedIn() && (
         (isOwner(userId) && isValidUserProfile(incoming()) && 
-         incoming().diff(existing()).affectedKeys().hasOnly(['displayName', 'photoUrl', 'lastActive'])) ||
+         incoming().diff(existing()).affectedKeys().hasOnly(['displayName', 'photoUrl', 'lastActive', 'role', 'premiumStatus', 'expiryDate', 'createdAt'])) ||
         (isTeacher() && isValidUserProfile(incoming()))
       );
     }
@@ -180,6 +197,14 @@ service cloud.firestore {
     match /alerts/{alertId} {
       allow read: if isTeacher();
       allow create: if isSignedIn() && isValidAlert(incoming()) && incoming().userId == request.auth.uid;
+      allow delete: if isTeacher();
+    }
+
+    match /speaking_mocks/{mockId} {
+      allow list: if isSignedIn() && (isTeacher() || resource.data.userId == request.auth.uid);
+      allow get: if isSignedIn() && (isTeacher() || resource.data.userId == request.auth.uid);
+      allow create: if isSignedIn() && isValidSpeakingMockResult(incoming()) && incoming().userId == request.auth.uid;
+      allow update: if isSignedIn() && isValidSpeakingMockResult(incoming()) && (isTeacher() || existing().userId == request.auth.uid);
       allow delete: if isTeacher();
     }
   }

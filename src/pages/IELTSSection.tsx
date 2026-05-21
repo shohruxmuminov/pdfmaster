@@ -35,7 +35,8 @@ import {
   Lock,
   AlertTriangle,
   Star,
-  Zap
+  Zap,
+  Volume2
 } from "lucide-react";
 
 import { BlobIframe } from "../components/BlobIframe";
@@ -286,7 +287,8 @@ export default function IELTSSection() {
       if ((m.examType || "IELTS") !== activeExamType) return false;
     }
 
-    if (cat === "mock-tests") return m.category === "Mock Tests";
+    if (cat === "mock-tests") return m.category === "Mock Tests" || !!m.mockTestId;
+    if (cat === "vocabulary") return m.category === "Vocabulary";
     return m.category.toLowerCase() === cat;
   });
 
@@ -532,6 +534,23 @@ export default function IELTSSection() {
                   <p className="text-white/80 max-w-2xl mx-auto text-lg">
                     {sectionConfig.subtitle}
                   </p>
+
+                  {/* Exam Type Toggle */}
+                  <div className="flex items-center gap-2 mt-8 bg-white/10 p-1.5 rounded-2xl backdrop-blur-md">
+                    {(["IELTS", "Multilevel"] as const).map((type) => (
+                      <button
+                        key={type}
+                        onClick={() => setActiveExamType(type)}
+                        className={`px-6 py-2 rounded-xl text-sm font-black uppercase tracking-widest transition-all ${
+                          activeExamType === type
+                            ? "bg-white text-slate-900 shadow-xl"
+                            : "text-white/70 hover:text-white"
+                        }`}
+                      >
+                        {type === "Multilevel" ? "Multilevel" : type}
+                      </button>
+                    ))}
+                  </div>
                 </motion.div>
               </div>
             </div>
@@ -979,7 +998,7 @@ export default function IELTSSection() {
                     </motion.div>
                   </div>
 
-                  <div className="relative flex-1 min-h-0 bg-white">
+                  <div className="relative flex-1 min-h-0 bg-white flex flex-col">
                     {(() => {
                       const mat = selectedMaterial as any;
                       const content = mat.content || "";
@@ -998,29 +1017,45 @@ export default function IELTSSection() {
                         content.startsWith("data:text/html") ||
                         (content.startsWith("http") && (category?.toLowerCase() === "reading" || category?.toLowerCase() === "listening"));
                         
-                      if (isHtmlContent) {
-                        return (
-                          <BlobIframe 
-                            content={content}
-                            className="w-full h-full border-none bg-white"
-                            title={selectedMaterial.name}
-                          />
-                        );
-                      }
                       return (
-                        <div className="flex flex-col items-center justify-center p-12 text-center h-full">
-                          <FileText className={`h-20 w-20 ${sectionConfig.textColor} mb-6`} />
-                          <h3 className="text-2xl font-bold mb-4">File Material</h3>
-                          <p className="text-slate-500 mb-8 max-w-md">This material is ready for download or viewing.</p>
-                          <div className="flex gap-4">
-                            <Button asChild size="lg" className={`${sectionConfig.buttonColor} text-white rounded-xl px-8`}>
-                              <a href={selectedMaterial.content} target="_blank" rel="noopener noreferrer">View File</a>
-                            </Button>
-                            <Button asChild size="lg" variant="outline" className="rounded-xl px-8">
-                              <a href={selectedMaterial.content} download={selectedMaterial.name}>Download</a>
-                            </Button>
+                        <>
+                          {mat.audioUrl && (
+                            <div className="bg-slate-50 dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 p-4 flex items-center gap-4">
+                              <div className="flex items-center gap-2 px-3 py-1.5 bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 rounded-lg text-[10px] font-black uppercase tracking-widest whitespace-nowrap">
+                                <Volume2 className="h-3 w-3" /> Listening Audio
+                              </div>
+                              <audio 
+                                src={mat.audioUrl} 
+                                controls 
+                                autoPlay 
+                                className="flex-1 h-8"
+                              />
+                            </div>
+                          )}
+                          <div className="flex-1 min-h-0">
+                            {isHtmlContent ? (
+                              <BlobIframe 
+                                content={content}
+                                className="w-full h-full border-none bg-white"
+                                title={selectedMaterial.name}
+                              />
+                            ) : (
+                              <div className="flex flex-col items-center justify-center p-12 text-center h-full">
+                                <FileText className={`h-20 w-20 ${sectionConfig.textColor} mb-6`} />
+                                <h3 className="text-2xl font-bold mb-4">File Material</h3>
+                                <p className="text-slate-500 mb-8 max-w-md">This material is ready for download or viewing.</p>
+                                <div className="flex gap-4">
+                                  <Button asChild size="lg" className={`${sectionConfig.buttonColor} text-white rounded-xl px-8`}>
+                                    <a href={selectedMaterial.content} target="_blank" rel="noopener noreferrer">View File</a>
+                                  </Button>
+                                  <Button asChild size="lg" variant="outline" className="rounded-xl px-8">
+                                    <a href={selectedMaterial.content} download={selectedMaterial.name}>Download</a>
+                                  </Button>
+                                </div>
+                              </div>
+                            )}
                           </div>
-                        </div>
+                        </>
                       );
                     })()}
                   </div>

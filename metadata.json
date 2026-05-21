@@ -1,5 +1,5 @@
 {
-  "name": "IELTS.net",
-  "description": "The ultimate IELTS preparation platform with Listening, Reading, Writing, and Speaking materials.",
+  "name": "IELTS Pro",
+  "description": "Professional IELTS and Multilevel preparation platform with AI instruments and teacher support.",
   "requestFramePermissions": ["microphone"]
 }

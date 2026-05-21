@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/src
 import { Button } from "@/src/components/ui/button";
 import { Input } from "@/src/components/ui/input";
 import { Label } from "@/src/components/ui/label";
-import { Moon, Sun, Monitor, Check, User, Save, Palette } from "lucide-react";
+import { Moon, Sun, Monitor, Check, User, Save, Palette, Mic2 } from "lucide-react";
 import { motion } from "framer-motion";
 import { updateProfile } from "firebase/auth";
 import { doc, updateDoc } from "firebase/firestore";
@@ -39,7 +39,7 @@ const colorThemes: { id: ColorTheme; name: string; color: string }[] = [
 ];
 
 export default function ProfileSettings() {
-  const { user, role, premiumStatus } = useGemini();
+  const { user, role, premiumStatus, speakingMocks } = useGemini();
   const { theme, setTheme, colorTheme, setColorTheme } = useTheme();
   
   const [displayName, setDisplayName] = useState(user?.displayName || "");
@@ -192,6 +192,34 @@ export default function ProfileSettings() {
               </div>
             </CardContent>
           </Card>
+          <Card className="border-none shadow-xl rounded-3xl">
+            <CardHeader>
+              <CardTitle className="text-2xl flex items-center gap-2">
+                <Mic2 className="h-6 w-6 text-primary" />
+                Speaking Mock Results
+              </CardTitle>
+              <CardDescription>Your graded speaking mock tests will appear here.</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {speakingMocks.filter(sm => sm.userId === user?.uid && sm.status === "Graded").length === 0 ? (
+                <p className="text-sm text-slate-500 italic">No graded mocks yet.</p>
+              ) : (
+                speakingMocks.filter(sm => sm.userId === user?.uid && sm.status === "Graded").map(sm => (
+                  <div key={sm.id} className="p-4 border border-emerald-100 dark:border-emerald-900/30 bg-emerald-50 dark:bg-emerald-900/10 rounded-2xl">
+                    <div className="flex justify-between items-center mb-2">
+                      <h4 className="font-bold text-emerald-800 dark:text-emerald-400">Mock Score: {sm.score}/75</h4>
+                      <span className="text-xs text-slate-500 font-medium">{new Date(sm.timestamp).toLocaleDateString()}</span>
+                    </div>
+                    <p className="text-sm text-slate-700 dark:text-slate-300 bg-white/50 dark:bg-slate-900/50 p-3 rounded-xl border border-emerald-100 dark:border-emerald-800/50 whitespace-pre-wrap">
+                      <span className="font-bold block mb-1">Feedback:</span>
+                      {sm.feedback}
+                    </p>
+                  </div>
+                ))
+              )}
+            </CardContent>
+          </Card>
+
         </div>
       </div>
     </div>

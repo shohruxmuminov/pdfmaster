@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { 
   signInWithEmailAndPassword, 
+  createUserWithEmailAndPassword,
   GoogleAuthProvider,
   signInWithPopup,
   OAuthProvider
@@ -16,6 +17,8 @@ import { useGemini } from "../components/GeminiContext";
 export default function Auth() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [displayName, setDisplayName] = useState("");
+  const [isSignUp, setIsSignUp] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
@@ -24,6 +27,22 @@ export default function Auth() {
   const handleAuthError = (err: any, context: string) => {
     console.error(`${context} error:`, err);
     let errorMessage = err.message || "An unexpected error occurred.";
+    
+    // Clear localized representation for authentication failures
+    if (
+      errorMessage.includes("invalid-credential") || 
+      errorMessage.includes("user-not-found") || 
+      errorMessage.includes("wrong-password") ||
+      errorMessage.includes("auth/invalid-credential")
+    ) {
+      errorMessage = "Noto'g'ri email yoki parol kiritildi. Agar tizimda hali hisobingiz bo'lmasa, pastdagi havola orqali ro'yxatdan o'ting.";
+    } else if (errorMessage.includes("email-already-in-use") || errorMessage.includes("auth/email-already-in-use")) {
+      errorMessage = "Ushbu email bilan allaqachon ro'yxatdan o'tilgan. Tizimga kirish bo'limiga o'ting.";
+    } else if (errorMessage.includes("weak-password") || errorMessage.includes("auth/weak-password")) {
+      errorMessage = "Parol juda zaif. Parol uzunligi kamida 6 ta belgidan iborat bo'lishi kerak.";
+    } else if (errorMessage.includes("invalid-email") || errorMessage.includes("auth/invalid-email")) {
+      errorMessage = "Iltimos, to'g'ri email manzili kiriting (Masalan: user@gmail.com).";
+    }
     setError(errorMessage);
   };
 
@@ -89,10 +108,25 @@ export default function Auth() {
     setLoading(true);
 
     try {
-      await signInWithEmailAndPassword(auth, email, password);
+      if (isSignUp) {
+        const result = await createUserWithEmailAndPassword(auth, email, password);
+        const user = result.user;
+        const isAdmin = user.email === "shohruxmuminov201@gmail.com";
+        
+        await setDoc(doc(db, "users", user.uid), {
+          uid: user.uid,
+          email: user.email,
+          premiumStatus: isAdmin ? "approved" : "none",
+          role: isAdmin ? "admin" : "user",
+          displayName: displayName || user.displayName || email.split("@")[0] || "User",
+          createdAt: new Date().toISOString()
+        });
+      } else {
+        await signInWithEmailAndPassword(auth, email, password);
+      }
       navigate("/");
     } catch (err: any) {
-      handleAuthError(err, "Admin sign-in");
+      handleAuthError(err, isSignUp ? "Admin sign-up" : "Admin sign-in");
     } finally {
       setLoading(false);
     }
@@ -115,36 +149,61 @@ export default function Auth() {
               <div className="bg-white/20 w-16 h-16 rounded-2xl backdrop-blur-md flex items-center justify-center mx-auto mb-4 shadow-xl">
                 <ShieldCheck className="h-8 w-8 text-white" />
               </div>
-              <h1 className="text-3xl font-black tracking-tight mb-2">Welcome</h1>
-              <p className="text-blue-100 text-sm">Sign in to access your dashboard</p>
+              <h1 className="text-3xl font-black tracking-tight mb-2">
+                {isSignUp ? "Register" : "Welcome"}
+              </h1>
+              <p className="text-blue-100 text-sm">
+                {isSignUp ? "Create a new teacher/admin account" : "Sign in to access your dashboard"}
+              </p>
             </div>
           </div>
 
           <div className="p-8">
             {error && (
-              <div className="mb-6 p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-xl text-red-600 dark:text-red-400 text-sm font-medium">
+              <div className="mb-6 p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-xl text-red-600 dark:text-red-400 text-sm font-medium leading-relaxed">
                 {error}
               </div>
             )}
 
-            <Button 
-              onClick={loginAsGuest}
-              className="w-full py-7 mb-6 rounded-2xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-lg shadow-xl shadow-indigo-500/20 transition-all active:scale-[0.98]"
-            >
-              <User className="mr-2 h-5 w-5" />
-              Continue as Student
-            </Button>
+            {!isSignUp && (
+              <Button 
+                onClick={loginAsGuest}
+                className="w-full py-7 mb-6 rounded-2xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-lg shadow-xl shadow-indigo-500/20 transition-all active:scale-[0.98]"
+              >
+                <User className="mr-2 h-5 w-5" />
+                Continue as Student
+              </Button>
+            )}
 
             <div className="relative py-4">
               <div className="absolute inset-0 flex items-center">
                 <div className="w-full border-t border-slate-200 dark:border-slate-800"></div>
               </div>
               <div className="relative flex justify-center text-xs uppercase">
-                <span className="bg-white dark:bg-slate-900 px-2 text-slate-500">Admin & Teacher Sign In</span>
+                <span className="bg-white dark:bg-slate-900 px-2 text-slate-500">
+                  {isSignUp ? "Email Registration" : "Admin & Teacher Sign In"}
+                </span>
               </div>
             </div>
 
             <form onSubmit={handleAdminSignIn} className="space-y-5">
+              {isSignUp && (
+                <div className="space-y-2">
+                  <label className="text-xs font-bold text-slate-400 uppercase tracking-widest ml-1">Full Name</label>
+                  <div className="relative">
+                    <User className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-slate-400" />
+                    <input 
+                      required
+                      type="text" 
+                      value={displayName}
+                      onChange={(e) => setDisplayName(e.target.value)}
+                      className="w-full pl-12 pr-4 py-4 rounded-2xl bg-slate-50 dark:bg-slate-800 border-none focus:ring-2 focus:ring-blue-500 outline-none transition-all"
+                      placeholder="Muminov Shohrukh"
+                    />
+                  </div>
+                </div>
+              )}
+
               <div className="space-y-2">
                 <label className="text-xs font-bold text-slate-400 uppercase tracking-widest ml-1">Email</label>
                 <div className="relative">
@@ -181,11 +240,26 @@ export default function Auth() {
                 variant="outline"
                 className="w-full py-7 rounded-2xl border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800 transition-all active:scale-[0.98]"
               >
-                {loading ? "Processing..." : "Sign In with Email"}
+                {loading ? "Processing..." : (isSignUp ? "Sign Up (Ro'yxatdan o'tish)" : "Sign In with Email")}
               </Button>
             </form>
 
-            <div className="grid grid-cols-2 gap-3 mt-4">
+            <div className="text-center mt-6">
+              <button
+                type="button"
+                onClick={() => {
+                  setIsSignUp(!isSignUp);
+                  setError("");
+                }}
+                className="text-sm font-semibold text-blue-600 dark:text-blue-400 hover:text-blue-700 hover:underline transition-colors focus:outline-none"
+              >
+                {isSignUp 
+                  ? "Akkauntingiz bormi? Tizimga kirish" 
+                  : "Yangi hisob yaratish (Ro'yxatdan o'tish)"}
+              </button>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3 mt-6">
               <Button 
                 type="button"
                 onClick={handleGoogleSignIn}

@@ -23,18 +23,22 @@ import {
   updateDoc,
   serverTimestamp,
   increment,
-  runTransaction
+  runTransaction,
+  where
 } from "firebase/firestore";
 
 interface Material {
   id: string;
-  category: "Listening" | "Reading" | "Writing" | "Speaking" | "Books" | "Vocabulary" | "Mock Tests";
-  subCategory?: "Listening" | "Reading" | "Writing" | "Speaking";
+  category: "Listening" | "Reading" | "Writing" | "Speaking" | "Books" | "Vocabulary" | "Mock Tests" | "English Movies" | "Dashboard Video";
+  subCategory?: string;
   examType?: "IELTS" | "Multilevel";
   name: string;
   mockTestId?: string;
   type: string;
   content: string;
+  audioUrl?: string;
+  thumbnail?: string;
+  subtitles?: string;
   timestamp: number;
   isPremium?: boolean;
 }
@@ -89,6 +93,26 @@ interface CheatAlert {
   type: "fullscreen_exit";
 }
 
+export interface SpeakingMockResult {
+  id?: string;
+  studentFirstName: string;
+  studentLastName: string;
+  teacherName: string;
+  mockId: string;
+  userId: string;
+  audioUrls: {
+    part1_1?: string;
+    part1_2?: string;
+    part2?: string;
+    part3?: string;
+  };
+  questionsData?: any;
+  score?: number | null;
+  feedback?: string | null;
+  status: "In Progress" | "Pending" | "Graded";
+  timestamp: number;
+}
+
 export interface AppUser {
   uid: string;
   email: string | null;
@@ -110,7 +134,12 @@ interface GeminiContextType {
   toggleGemini: (enabled: boolean) => void;
   updateUserPremium: (userId: string, isPremium: boolean, expiryDays: number) => Promise<void>;
   materials: Material[];
-  addMaterial: (material: Omit<Material, "id" | "timestamp">, file?: File, contentString?: string) => Promise<void>;
+  addMaterial: (
+    material: Omit<Material, "id" | "timestamp">, 
+    file?: File, 
+    contentString?: string,
+    extraFiles?: { audio?: File; thumbnail?: File; subtitles?: File; video?: File }
+  ) => Promise<void>;
   deleteMaterial: (id: string) => void;
   clearMaterialsExceptSpeaking: () => Promise<void>;
   results: UserResult[];
@@ -130,6 +159,12 @@ interface GeminiContextType {
   grantPremiumStatus: (userId: string, role: "admin" | "teacher") => Promise<void>;
   loginAsGuest: () => void;
   logout: () => Promise<void>;
+  speakingMocks: SpeakingMockResult[];
+  initSpeakingMockResult: (data: Omit<SpeakingMockResult, "id" | "timestamp" | "userId" | "status" | "audioUrls">) => Promise<string | undefined>;
+  uploadSpeakingMockAudio: (docId: string, partKey: string, blob: Blob) => Promise<void>;
+  finishSpeakingMock: (docId: string) => Promise<void>;
+  gradeSpeakingMockResult: (id: string, score: number, feedback: string) => Promise<void>;
+  deleteSpeakingMockResult: (id: string) => Promise<void>;
 }
 
 const GeminiContext = createContext<GeminiContextType | undefined>(undefined);
@@ -198,6 +233,7 @@ export function GeminiProvider({ children }: { children: React.ReactNode }) {
   const [transcriptions, setTranscriptions] = useState<Transcription[]>([]);
   const [allUsers, setAllUsers] = useState<UserProfile[]>([]);
   const [cheatAlerts, setCheatAlerts] = useState<CheatAlert[]>([]);
+  const [speakingMocks, setSpeakingMocks] = useState<SpeakingMockResult[]>([]);
 
   const isPremium = expiryDate ? Date.now() < expiryDate : false;
 
@@ -210,6 +246,16 @@ export function GeminiProvider({ children }: { children: React.ReactNode }) {
         localStorage.removeItem("guest_mode");
         isGuestMode = false;
         
+        // Reset admin/teacher related states to avoid race conditions
+        setRole("user");
+        setExpiryDate(null);
+        setIsBlocked(false);
+        setIsMockTestEnabled(false);
+        setResults([]);
+        setTranscriptions([]);
+        setAllUsers([]);
+        setCheatAlerts([]);
+
         setUser({
           uid: currentUser.uid,
           email: currentUser.email,
@@ -219,12 +265,14 @@ export function GeminiProvider({ children }: { children: React.ReactNode }) {
         });
 
         const userDocRef = doc(db, "users", currentUser.uid);
+        const isAdmin = currentUser.email?.toLowerCase() === "shohruxmuminov201@gmail.com";
         
         await setDoc(userDocRef, {
           uid: currentUser.uid,
           email: currentUser.email,
           displayName: currentUser.displayName || currentUser.email?.split('@')[0] || "User",
-          lastActive: Date.now()
+          lastActive: Date.now(),
+          ...(isAdmin ? { role: "admin", premiumStatus: "approved" } : {})
         }, { merge: true });
 
         unsubscribeUser = onSnapshot(userDocRef, (docSnap) => {
@@ -367,12 +415,24 @@ export function GeminiProvider({ children }: { children: React.ReactNode }) {
       });
     }
 
+    let qMocks;
+    if (role === "admin" || role === "teacher") {
+       qMocks = query(collection(db, "speaking_mocks"), orderBy("timestamp", "desc"));
+    } else {
+       qMocks = query(collection(db, "speaking_mocks"), where("userId", "==", user.uid), orderBy("timestamp", "desc"));
+    }
+    const unsubscribeMocks = onSnapshot(qMocks, (snapshot) => {
+      const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as SpeakingMockResult));
+      setSpeakingMocks(data);
+    });
+
     return () => {
       unsubscribeMaterials();
       unsubscribeResults();
       unsubscribeTranscriptions();
       unsubscribeUsers();
       unsubscribeAlerts();
+      unsubscribeMocks();
     };
   }, [user, role]);
 
@@ -406,77 +466,57 @@ export function GeminiProvider({ children }: { children: React.ReactNode }) {
     });
   };
 
-  const addMaterial = async (material: Omit<Material, "id" | "timestamp">, file?: File, contentString?: string) => {
+  const addMaterial = async (
+    material: Omit<Material, "id" | "timestamp">, 
+    file?: File, 
+    contentString?: string,
+    extraFiles?: { audio?: File; thumbnail?: File; subtitles?: File; video?: File }
+  ) => {
     let contentUrl = material.content;
+    let audioUrl = material.audioUrl;
+    let thumbnailUrl = material.thumbnail;
+    let subtitlesUrl = material.subtitles;
 
     try {
-      if (file || contentString) {
-        let size = 0;
+      // Helper to upload a file and return URL
+      const uploadFile = async (f: File, path: string) => {
+        const safeName = f.name.replace(/[^a-zA-Z0-9.\-_]/g, '_');
+        const storageRef = ref(storage, `${path}/${Date.now()}_${safeName}`);
+        const snapshot = await uploadBytes(storageRef, f, { contentType: f.type });
+        return await getDownloadURL(snapshot.ref);
+      };
+
+      // Upload main file/content or video
+      if (extraFiles?.video) {
+        contentUrl = await uploadFile(extraFiles.video, "videos");
+      } else if (file || contentString) {
         if (file) {
-          size = file.size;
+          contentUrl = await uploadFile(file, "materials");
         } else if (contentString) {
-          size = contentString.length;
+          const type = material.type || "text/html";
+          const storageRef = ref(storage, `materials/manual_${Date.now()}.html`);
+          const snapshot = await uploadBytes(storageRef, new Blob([contentString], { type }), { contentType: type });
+          contentUrl = await getDownloadURL(snapshot.ref);
         }
+      }
 
-        const resolvedType = material.type || (file ? file.type : "text/html") || "text/html";
-        const isHtml = resolvedType.includes("html");
-
-        try {
-          const fileName = file ? file.name : `manual_${Date.now()}.html`;
-          const safeName = fileName.replace(/[^a-zA-Z0-9.\-_]/g, '_');
-          const storageRef = ref(storage, `materials/${Date.now()}_${safeName}`);
-          
-          let uploadPromise;
-          if (file) {
-            uploadPromise = uploadBytes(storageRef, file, { contentType: resolvedType });
-          } else if (contentString) {
-            uploadPromise = uploadBytes(storageRef, new Blob([contentString], { type: resolvedType }), { contentType: resolvedType });
-          }
-          
-          if (uploadPromise) {
-            const snapshot = await Promise.race([
-              uploadPromise,
-              new Promise((_, reject) => setTimeout(() => reject(new Error("Storage upload timed out")), 10000))
-            ]);
-            contentUrl = await getDownloadURL((snapshot as any).ref);
-          }
-        } catch (storageError: any) {
-          const MAX_FIRESTORE_SIZE = 950000;
-          if (size >= MAX_FIRESTORE_SIZE) {
-            throw new Error(`Upload failed: File is too large.`);
-          }
-
-          if (isHtml) {
-             if (contentString && !contentString.startsWith("data:")) {
-               contentUrl = contentString;
-             } else if (file) {
-               const rawHtml = await new Promise<string>((resolve, reject) => {
-                 const reader = new FileReader();
-                 reader.onload = () => resolve(reader.result as string);
-                 reader.onerror = () => reject(new Error("Failed to read HTML file"));
-                 reader.readAsText(file);
-               });
-               contentUrl = rawHtml;
-             }
-          } else {
-            if (contentString && contentString.startsWith("data:")) {
-              contentUrl = contentString;
-            } else if (file) {
-              const base64 = await new Promise<string>((resolve, reject) => {
-                const reader = new FileReader();
-                reader.onload = () => resolve(reader.result as string);
-                reader.onerror = () => reject(new Error("Failed to read file for fallback"));
-                reader.readAsDataURL(file);
-              });
-              contentUrl = base64;
-            }
-          }
-        }
+      // Upload extra files
+      if (extraFiles?.audio) {
+        audioUrl = await uploadFile(extraFiles.audio, "audio");
+      }
+      if (extraFiles?.thumbnail) {
+        thumbnailUrl = await uploadFile(extraFiles.thumbnail, "thumbnails");
+      }
+      if (extraFiles?.subtitles) {
+        subtitlesUrl = await uploadFile(extraFiles.subtitles, "subtitles");
       }
 
       await addDoc(collection(db, "materials"), {
         ...material,
         content: contentUrl,
+        audioUrl: audioUrl || "",
+        thumbnail: thumbnailUrl || "",
+        subtitles: subtitlesUrl || "",
         timestamp: serverTimestamp()
       });
     } catch (error) {
@@ -593,6 +633,71 @@ export function GeminiProvider({ children }: { children: React.ReactNode }) {
       });
     } catch (error) {
       handleFirestoreError(error, OperationType.CREATE, "transcriptions");
+    }
+  };
+
+  const initSpeakingMockResult = async (data: Omit<SpeakingMockResult, "id" | "timestamp" | "userId" | "status" | "audioUrls">) => {
+    if (!user) return;
+    try {
+      const docRef = await addDoc(collection(db, "speaking_mocks"), {
+        ...data,
+        audioUrls: {},
+        userId: user.uid,
+        status: "In Progress",
+        score: null,
+        feedback: null,
+        timestamp: Date.now()
+      });
+      return docRef.id;
+    } catch (error) {
+      handleFirestoreError(error, OperationType.CREATE, "speaking_mocks");
+    }
+  };
+
+  const uploadSpeakingMockAudio = async (docId: string, partKey: string, blob: Blob) => {
+    try {
+      const storageRef = ref(storage, `speaking_mocks/${docId}_${partKey}_${Date.now()}.webm`);
+      const snapshot = await uploadBytes(storageRef, blob, { contentType: "audio/webm" });
+      const url = await getDownloadURL(snapshot.ref);
+
+      const docRef = doc(db, "speaking_mocks", docId);
+      await updateDoc(docRef, {
+        [`audioUrls.${partKey}`]: url
+      });
+    } catch (error) {
+      handleFirestoreError(error, OperationType.UPDATE, `speaking_mocks/${docId}`);
+    }
+  };
+
+  const finishSpeakingMock = async (docId: string) => {
+    try {
+      await updateDoc(doc(db, "speaking_mocks", docId), {
+        status: "Pending"
+      });
+    } catch (error) {
+      handleFirestoreError(error, OperationType.UPDATE, `speaking_mocks/${docId}`);
+    }
+  };
+
+  const gradeSpeakingMockResult = async (id: string, score: number, feedback: string) => {
+    if (role !== "admin" && role !== "teacher") return;
+    try {
+      await updateDoc(doc(db, "speaking_mocks", id), {
+        score,
+        feedback,
+        status: "Graded"
+      });
+    } catch (error) {
+      handleFirestoreError(error, OperationType.UPDATE, `speaking_mocks/${id}`);
+    }
+  };
+
+  const deleteSpeakingMockResult = async (id: string) => {
+    if (role !== "admin" && role !== "teacher") return;
+    try {
+      await deleteDoc(doc(db, "speaking_mocks", id));
+    } catch (error) {
+      handleFirestoreError(error, OperationType.DELETE, `speaking_mocks/${id}`);
     }
   };
 
@@ -779,14 +884,19 @@ export function GeminiProvider({ children }: { children: React.ReactNode }) {
   const grantPremiumStatus = async (userId: string, role: "admin" | "teacher") => {
     try {
       if (!user) return;
-      await setDoc(doc(db, "users", userId), {
+      const dataToSet: any = {
         uid: userId,
-        email: user.email || "no-email",
         expiryDate: Date.now() + (365 * 24 * 60 * 60 * 1000), 
         role: role,
-        displayName: user.displayName || (role === "admin" ? "Admin" : "Teacher"),
         createdAt: new Date().toISOString()
-      }, { merge: true });
+      };
+      
+      if (userId === user.uid) {
+        dataToSet.email = user.email || "no-email";
+        dataToSet.displayName = user.displayName || (role === "admin" ? "Admin" : "Teacher");
+      }
+      
+      await setDoc(doc(db, "users", userId), dataToSet, { merge: true });
     } catch (error) {
       handleFirestoreError(error, OperationType.WRITE, `users/${userId}`);
     }
@@ -824,7 +934,13 @@ export function GeminiProvider({ children }: { children: React.ReactNode }) {
       gradeMockTest,
       grantPremiumStatus,
       loginAsGuest,
-      logout
+      logout,
+      speakingMocks,
+      initSpeakingMockResult,
+      uploadSpeakingMockAudio,
+      finishSpeakingMock,
+      gradeSpeakingMockResult,
+      deleteSpeakingMockResult
     }}>
       {children}
     </GeminiContext.Provider>

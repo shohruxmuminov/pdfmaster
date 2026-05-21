@@ -4,6 +4,7 @@ import Home from "./pages/Home";
 import AdminPanel from "./pages/AdminPanel";
 import TeacherPanel from "./pages/TeacherPanel";
 import IELTSSection from "./pages/IELTSSection";
+import EnglishMovies from "./pages/EnglishMovies";
 import Auth from "./pages/Auth";
 import { GeminiProvider, useGemini } from "./components/GeminiContext";
 import { ThemeProvider } from "./components/ThemeProvider";
@@ -29,15 +30,19 @@ function ProtectedRoute({ children, requireAuth = false }: { children: React.Rea
   return <>{children}</>;
 }
 
+import MultilevelSpeakingMock from "./pages/MultilevelSpeakingMock";
+
 function AppRoutes() {
   return (
     <Routes>
       <Route path="/auth" element={<Auth />} />
+      <Route path="/multilevel-mock" element={<ProtectedRoute><MultilevelSpeakingMock /></ProtectedRoute>} />
       <Route path="/" element={<Layout />}>
         <Route index element={<Home />} />
         <Route path="admin" element={<ProtectedRoute requireAuth><AdminPanel /></ProtectedRoute>} />
         <Route path="teacher" element={<ProtectedRoute requireAuth><TeacherPanel /></ProtectedRoute>} />
         <Route path="settings" element={<ProtectedRoute><ProfileSettings /></ProtectedRoute>} />
+        <Route path="english-movies" element={<ProtectedRoute><EnglishMovies /></ProtectedRoute>} />
         <Route path=":category" element={<ProtectedRoute><IELTSSection /></ProtectedRoute>} />
       </Route>
     </Routes>

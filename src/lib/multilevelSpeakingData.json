@@ -1,0 +1,119 @@
+{
+  "part1_1": [
+    { "id": "p1_1_1", "topic": "Technology", "questions": ["What kind of technology do you use every day?", "How has technology changed the way people communicate?", "What is your favorite piece of technology and why?"] },
+    { "id": "p1_1_2", "topic": "Education", "questions": ["What was your favorite subject in school?", "Do you prefer studying alone or in a group?", "How important is higher education in your country?"] },
+    { "id": "p1_1_3", "topic": "Environment", "questions": ["What are the main environmental problems in your city?", "Do you recycle materials at home?", "How can we encourage people to protect the environment?"] },
+    { "id": "p1_1_4", "topic": "Travel", "questions": ["Do you enjoy traveling to new places?", "What was the most interesting place you have visited?", "Do you prefer traveling alone or with friends?"] },
+    { "id": "p1_1_5", "topic": "Food", "questions": ["What is your favorite type of food?", "Do you enjoy cooking at home?", "How has your diet changed over the past few years?"] },
+    { "id": "p1_1_6", "topic": "Hobbies", "questions": ["What do you like to do in your free time?", "How long have you had this hobby?", "Why do you think it is important for people to have hobbies?"] },
+    { "id": "p1_1_7", "topic": "Sports", "questions": ["Do you enjoy watching or playing sports?", "What is the most popular sport in your country?", "How does playing sports help people stay healthy?"] },
+    { "id": "p1_1_8", "topic": "Music", "questions": ["What kind of music do you like?", "When do you usually listen to music?", "Do you think music education should be mandatory in schools?"] },
+    { "id": "p1_1_9", "topic": "Books", "questions": ["Do you enjoy reading books?", "What was the last book you read?", "Do you prefer digital books or traditional paper books?"] },
+    { "id": "p1_1_10", "topic": "Work", "questions": ["What is your current occupation?", "What do you like most about your work/study?", "What would be your dream job in the future?"] },
+    { "id": "p1_1_11", "topic": "Family", "questions": ["How much time do you spend with your family?", "Who are you closest to in your family?", "What family traditions do you have?"] },
+    { "id": "p1_1_12", "topic": "Hometown", "questions": ["Where are you from?", "What is the most interesting thing about your hometown?", "How has your hometown changed in recent years?"] },
+    { "id": "p1_1_13", "topic": "Social Media", "questions": ["How often do you use social media?", "What are the benefits of staying connected online?", "Do you think social media has a negative impact on society?"] },
+    { "id": "p1_1_14", "topic": "Health", "questions": ["What do you do to stay healthy?", "Is it easy to find healthy food in your area?", "Do you think people are more health-conscious now than in the past?"] },
+    { "id": "p1_1_15", "topic": "Languages", "questions": ["How many languages do you speak?", "Why are you learning English?", "What is the most difficult part of learning a new language?"] },
+    { "id": "p1_1_16", "topic": "Weekends", "questions": ["What do you usually do on the weekends?", "Do you prefer busy or relaxing weekends?", "What is your idea of a perfect weekend?"] },
+    { "id": "p1_1_17", "topic": "Weather", "questions": ["What is your favorite type of weather?", "Does the weather affect your mood?", "What do you like to do when it rains?"] },
+    { "id": "p1_1_18", "topic": "Animals", "questions": ["Do you have any pets?", "What is your favorite animal?", "Why are some animals becoming extinct?"] },
+    { "id": "p1_1_19", "topic": "Public Transport", "questions": ["How do you usually travel around your city?", "Do you think public transport is efficient in your area?", "What could be done to improve public transport?"] },
+    { "id": "p1_1_20", "topic": "Shopping", "questions": ["Do you enjoy shopping?", "What was the last thing you bought?", "Do you prefer shopping online or in physical stores?"] }
+  ],
+  "part1_2": [
+    {
+      "id": "p1_2_1",
+      "topic": "Work Environments",
+      "imagePrompts": ["Modern open office with people working on computers", "Cozy home office with a minimalist desk and plants"],
+      "questions": ["Look at these two pictures showing different work environments. What are the main differences?", "Which of these environments do you prefer and why?", "How does the environment affect a person's productivity?"]
+    },
+    {
+      "id": "p1_2_2",
+      "topic": "Transportation",
+      "imagePrompts": ["A modern electric car charging at a station", "A crowded public bus in a busy city street"],
+      "questions": ["Compare the two modes of transportation shown in the pictures.", "When would you choose to use one over the other?", "What are the environmental impacts of these transportation methods?"]
+    },
+    {
+      "id": "p1_2_3",
+      "topic": "Housing",
+      "imagePrompts": ["A traditional wooden house in the countryside", "A luxury modern skyscraper in a dynamic city"],
+      "questions": ["What are the advantages of living in the types of homes shown in the pictures?", "Which lifestyle appeals to you more: rural or urban?", "How does housing affect family life?"]
+    },
+    {
+      "id": "p1_2_4",
+      "topic": "Eating Out",
+      "imagePrompts": ["A group of friends laughing at a street food stall", "A couple dining quietly in a formal expensive restaurant"],
+      "questions": ["What are the different atmospheres shown in these pictures?", "Which dining experience do you enjoy more?", "Do you think dining etiquette is still important today?"]
+    },
+    {
+      "id": "p1_2_5",
+      "topic": "Physical Activity",
+      "imagePrompts": ["A person running alone in a beautiful park", "A group of people playing basketball together"],
+      "questions": ["Compare these two types of physical activity.", "Do you prefer individual or team sports?", "How does regular exercise improve mental health?"]
+    },
+    {
+      "id": "p1_2_6",
+      "topic": "Study Methods",
+      "imagePrompts": ["A student studying in a quiet library with books", "A student participating in an online webinar on a laptop"],
+      "questions": ["What are the benefits of the two study methods shown?", "Which method is more effective for long-term learning?", "How has technology changed the way students study?"]
+    },
+    {
+      "id": "p1_2_7",
+      "topic": "Nature vs City",
+      "imagePrompts": ["A serene forest landscape with a winding river", "A busy city intersection with neon lights and tall buildings"],
+      "questions": ["Look at the contrast between these two environments. What do they represent to you?", "Where would you prefer to spend a long holiday?", "Why is it important for cities to have green spaces?"]
+    },
+    {
+      "id": "p1_2_8",
+      "topic": "Shopping Types",
+      "imagePrompts": ["A vibrant traditional local market with fresh produce", "A high-end shopping mall with glass displays"],
+      "questions": ["What is the experience like in each of these shopping venues?", "Which one offers better value for money in your opinion?", "How is traditional commerce surviving in the age of malls?"]
+    }
+  ],
+  "part2": [
+    { "id": "p2_1", "topic": "A Memorable Journey", "cueCard": "Describe a memorable journey you have taken.\nYou should say:\n- where you went\n- who you were with\n- what you did there\nAnd explain why this journey was so memorable to you." },
+    { "id": "p2_2", "topic": "An Important Decision", "cueCard": "Describe an important decision you made in your life.\nYou should say:\n- what the decision was\n- when you made it\n- how it affected your life\nAnd explain whether you think it was the right decision." },
+    { "id": "p2_3", "topic": "A Person You Admire", "cueCard": "Describe a person you admire.\nYou should say:\n- who this person is\n- how you know them\n- what they have achieved\nAnd explain why you admire them so much." },
+    { "id": "p2_4", "topic": "A Favorite Book", "cueCard": "Describe a book that has had a significant impact on you.\nYou should say:\n- what the book is\n- what it is about\n- when you read it\nAnd explain why it was so impactful for you." },
+    { "id": "p2_5", "topic": "A Future Goal", "cueCard": "Describe a personal goal you want to achieve in the future.\nYou should say:\n- what the goal is\n- how you plan to achieve it\n- when you want to achieve it\nAnd explain why this goal is important to you." }
+  ],
+  "part3": [
+    {
+      "id": "p3_1",
+      "topic": "Books vs Movies",
+      "question": "Books are better than movies for storytelling. Discuss.",
+      "argument": "Books allow for more imagination as the reader creates the world in their mind.",
+      "development": "For example, when reading a novel, you visualize the characters and settings based on descriptions, making the experience unique to you, whereas a movie provides a fixed visual interpretation.",
+      "argumentsFor": ["Greater depth of imagination", "Detailed character development", "Stronger emotional engagement"],
+      "argumentsAgainst": ["Movies are more visually engaging", "Films save time and effort", "Visual effects enhance storytelling"]
+    },
+    {
+      "id": "p3_2",
+      "topic": "AI in Education",
+      "question": "Artificial intelligence will completely replace teachers in the future. Discuss.",
+      "argument": "AI can provide highly personalized and adaptive learning paths for every student.",
+      "development": "Sophisticated algorithms can identify a student's weak points instantly and provide targeted practice, something a human teacher with 30 students might struggle to do consistently.",
+      "argumentsFor": ["Highly personalized learning paths", "Available 24/7", "Instant feedback and grading"],
+      "argumentsAgainst": ["Lacks emotional intelligence", "Cannot inspire or motivate students", "Social interaction is crucial for learning"]
+    },
+    {
+      "id": "p3_3",
+      "topic": "Remote Work",
+      "question": "Working from home is more beneficial than working in an office. Discuss.",
+      "argument": "Remote work signficantly reduces the time and stress associated with daily commuting.",
+      "development": "By eliminating the need to travel to an office, employees often find they have more time for family or personal hobbies, which leads to a better overall work-life balance and higher job satisfaction.",
+      "argumentsFor": ["Reduces commuting time and stress", "Offers better work-life balance", "Lower operational costs for companies"],
+      "argumentsAgainst": ["Less teamwork and collaboration", "Harder to separate work from personal life", "Can lead to social isolation"]
+    },
+    {
+      "id": "p3_4",
+      "topic": "Social Media Impact",
+      "question": "Social media has done more harm than good for teenage mental health. Discuss.",
+      "argument": "Constant comparison with others' 'perfect' lives can lead to feelings of inadequacy and low self-esteem.",
+      "development": "Teenagers often see curated, highly edited photos on platforms like Instagram, which sets unrealistic beauty and lifestyle standards that are impossible to meet in real life.",
+      "argumentsFor": ["Causes social comparison issues", "Linked to online bullying", "Can be highly addictive"],
+      "argumentsAgainst": ["Helps maintain friendships", "Provides a platform for self-expression", "Access to diverse information and support"]
+    }
+  ]
+}

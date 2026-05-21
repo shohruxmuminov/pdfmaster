@@ -89,7 +89,8 @@ export default function AdminPanel() {
     subCategory: "Listening" as any,
     examType: "IELTS" as "IELTS" | "Multilevel",
     mockTestId: "",
-    isPremium: false
+    isPremium: false,
+    externalUrl: "" // New: for movie links or external sources
   });
 
   // Calculate next mock test number
@@ -115,6 +116,17 @@ export default function AdminPanel() {
 
   const [fileContent, setFileContent] = useState<string | null>(null);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [extraFiles, setExtraFiles] = useState<{
+    audio: File | null;
+    thumbnail: File | null;
+    subtitles: File | null;
+    video: File | null;
+  }>({
+    audio: null,
+    thumbnail: null,
+    subtitles: null,
+    video: null
+  });
   const [fileName, setFileName] = useState("");
   const [fileType, setFileType] = useState("");
   const [mockTestFiles, setMockTestFiles] = useState<{
@@ -205,27 +217,33 @@ export default function AdminPanel() {
           }
         }
       } else {
-        if (!selectedFile && !fileContent) {
-          setError("Please select a file or paste HTML content first.");
+        if (!selectedFile && !fileContent && !materialForm.externalUrl && !extraFiles.video) {
+          setError("Please select a file, paste HTML content, or provide a movie file.");
           setIsUploading(false);
           return;
         }
-        const isAutoName = materialForm.category === "Books" || materialForm.category === "Vocabulary";
+        const isAutoName = materialForm.category === "Books" || materialForm.category === "Vocabulary" || materialForm.category === "Dashboard Video";
         
         await addMaterial({
-          name: isAutoName ? (fileName || "Manual Material") : materialForm.name,
+          name: isAutoName ? (materialForm.name || fileName || (materialForm.category === "Dashboard Video" ? "Hero Video" : "Manual Material")) : materialForm.name,
           category: materialForm.category,
           subCategory: materialForm.subCategory || materialForm.category,
           examType: (materialForm.category === "Listening" || materialForm.category === "Reading" || materialForm.category === "Writing" || materialForm.category === "Mock Tests") ? materialForm.examType : undefined,
-          type: fileType || "text/html",
+          type: extraFiles.video ? extraFiles.video.type : (materialForm.externalUrl ? "video/external" : (fileType || "text/html")),
           isPremium: materialForm.isPremium,
-          content: ""
-        }, selectedFile || undefined, fileContent || undefined);
+          content: materialForm.externalUrl || ""
+        }, selectedFile || undefined, fileContent || undefined, {
+          audio: extraFiles.audio || undefined,
+          thumbnail: extraFiles.thumbnail || undefined,
+          subtitles: extraFiles.subtitles || undefined,
+          video: extraFiles.video || undefined
+        });
       }
 
-      setMaterialForm({ name: "", category: "Listening", subCategory: "Listening", examType: "IELTS", mockTestId: "", isPremium: false });
+      setMaterialForm({ name: "", category: "Listening" as any, subCategory: "Listening" as any, examType: "IELTS", mockTestId: "", isPremium: false, externalUrl: "" });
       setFileContent(null);
       setSelectedFile(null);
+      setExtraFiles({ audio: null, thumbnail: null, subtitles: null, video: null });
       setFileName("");
       setMockTestFiles({ Listening: null, Reading: null, Writing: null, Speaking: null });
       if (fileInputRef.current) fileInputRef.current.value = "";
@@ -549,8 +567,25 @@ export default function AdminPanel() {
                           <option value="Books">Books</option>
                           <option value="Vocabulary">Vocabulary</option>
                           <option value="Mock Tests">Mock Tests</option>
+                          <option value="English Movies">English Movies</option>
+                          <option value="Dashboard Video">Dashboard Video</option>
                         </select>
                       </div>
+
+                      {materialForm.category === "English Movies" && (
+                        <div className="space-y-2">
+                          <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Movie Category</label>
+                          <select 
+                            value={materialForm.subCategory}
+                            onChange={(e) => setMaterialForm({ ...materialForm, subCategory: e.target.value as any })}
+                            className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900 outline-none focus:ring-2 focus:ring-blue-500"
+                          >
+                            <option value="Films">Films</option>
+                            <option value="Cartoons">Cartoons</option>
+                            <option value="Anime">Anime</option>
+                          </select>
+                        </div>
+                      )}
 
                       {(materialForm.category === "Listening" || materialForm.category === "Reading" || materialForm.category === "Writing" || materialForm.category === "Mock Tests") && (
                         <div className="space-y-2">
@@ -585,14 +620,29 @@ export default function AdminPanel() {
 
                       {materialForm.category !== "Books" && materialForm.category !== "Vocabulary" && (
                         <div className="space-y-2">
-                          <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Test Name</label>
+                          <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Name / Title</label>
                           <input 
                             type="text" 
-                            placeholder={materialForm.category === "Mock Tests" ? `Mock Test ${nextMockNumber}` : "e.g. Cambridge 18 Test 1"}
+                            placeholder={materialForm.category === "Mock Tests" ? `Mock Test ${nextMockNumber}` : (materialForm.category === "English Movies" ? "Movie Name" : "e.g. Cambridge 18 Test 1")}
                             value={materialForm.name}
                             onChange={(e) => setMaterialForm({ ...materialForm, name: e.target.value })}
                             className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900 outline-none focus:ring-2 focus:ring-blue-500"
                           />
+                        </div>
+                      )}
+
+                      {(materialForm.category === "English Movies" || materialForm.category === "Dashboard Video") && (
+                        <div className="space-y-2">
+                          <label className="text-sm font-bold text-cyan-600 dark:text-cyan-400 uppercase tracking-widest block mb-1">
+                            {materialForm.category === "Dashboard Video" ? "Dashboard Promo Video" : "Movie Video File"}
+                          </label>
+                          <input 
+                            type="file" 
+                            accept="video/*"
+                            onChange={(e) => setExtraFiles(prev => ({ ...prev, video: e.target.files?.[0] || null }))}
+                            className="w-full text-xs text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-xs file:font-black file:bg-cyan-50 file:text-cyan-600 hover:file:bg-cyan-100"
+                          />
+                          <p className="text-[10px] text-slate-400 mt-1 italic">Upload MP4, WebM or OGG video files.</p>
                         </div>
                       )}
                     </div>
@@ -613,23 +663,59 @@ export default function AdminPanel() {
                           ))}
                         </div>
                       </div>
-                    ) : (
-                      <div className="space-y-4">
-                        <label className="text-sm font-medium text-slate-700 dark:text-slate-300">File Content (HTML or Text)</label>
-                        <div 
-                          onClick={() => fileInputRef.current?.click()}
-                          className="border-2 border-dashed border-slate-200 dark:border-slate-800 rounded-3xl p-12 text-center cursor-pointer hover:border-blue-500 transition-colors bg-slate-50 dark:bg-slate-900/50"
-                        >
-                          <Upload className="h-10 w-10 text-slate-300 mx-auto mb-4" />
-                          <p className="text-sm font-bold text-slate-900 dark:text-white">{fileName || "Click to upload file"}</p>
-                          <p className="text-xs text-slate-500 mt-2">HTML, PDF, or TXT files supported</p>
+                    ) : materialForm.category === "English Movies" ? (
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-4 border-t border-slate-100 dark:border-slate-800">
+                        <div className="space-y-2">
+                          <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Thumbnail Image</label>
+                          <input 
+                            type="file" 
+                            accept="image/*"
+                            onChange={(e) => setExtraFiles(prev => ({ ...prev, thumbnail: e.target.files?.[0] || null }))}
+                            className="w-full text-xs text-slate-500"
+                          />
                         </div>
-                        <input 
-                          type="file" 
-                          ref={fileInputRef}
-                          onChange={handleFileChange}
-                          className="hidden" 
-                        />
+                        <div className="space-y-2">
+                          <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Subtitles File (VTT/SRT)</label>
+                          <input 
+                            type="file" 
+                            accept=".vtt,.srt"
+                            onChange={(e) => setExtraFiles(prev => ({ ...prev, subtitles: e.target.files?.[0] || null }))}
+                            className="w-full text-xs text-slate-500"
+                          />
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="space-y-6">
+                        <div className="space-y-4">
+                          <label className="text-sm font-medium text-slate-700 dark:text-slate-300">File Content (HTML or Text)</label>
+                          <div 
+                            onClick={() => fileInputRef.current?.click()}
+                            className="border-2 border-dashed border-slate-200 dark:border-slate-800 rounded-3xl p-12 text-center cursor-pointer hover:border-blue-500 transition-colors bg-slate-50 dark:bg-slate-900/50"
+                          >
+                            <Upload className="h-10 w-10 text-slate-300 mx-auto mb-4" />
+                            <p className="text-sm font-bold text-slate-900 dark:text-white">{fileName || "Click to upload file"}</p>
+                            <p className="text-xs text-slate-500 mt-2">HTML, PDF, or TXT files supported</p>
+                          </div>
+                          <input 
+                            type="file" 
+                            ref={fileInputRef}
+                            onChange={handleFileChange}
+                            className="hidden" 
+                          />
+                        </div>
+
+                        {materialForm.category === "Listening" && (
+                          <div className="p-6 bg-blue-50 dark:bg-blue-900/10 rounded-2xl border border-blue-100 dark:border-blue-900/20">
+                            <label className="text-sm font-bold text-blue-600 dark:text-blue-400 uppercase tracking-widest block mb-4">Listening Audio File</label>
+                            <input 
+                              type="file" 
+                              accept="audio/*"
+                              onChange={(e) => setExtraFiles(prev => ({ ...prev, audio: e.target.files?.[0] || null }))}
+                              className="text-xs text-slate-500"
+                            />
+                            <p className="text-[10px] text-slate-400 mt-2 italic">Uploading an audio file here will enable "Auto-play" for students when they start the test.</p>
+                          </div>
+                        )}
                       </div>
                     )}
 
@@ -649,7 +735,7 @@ export default function AdminPanel() {
                         type="button"
                         variant="outline"
                         onClick={() => {
-                          setMaterialForm({ name: "", category: "Listening", subCategory: "Listening", examType: "IELTS", mockTestId: "", isPremium: false });
+                          setMaterialForm({ name: "", category: "Listening" as any, subCategory: "Listening" as any, examType: "IELTS", mockTestId: "", isPremium: false, externalUrl: "" });
                           setFileContent(null);
                           setSelectedFile(null);
                           setFileName("");
